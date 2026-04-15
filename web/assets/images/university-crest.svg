@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="University crest">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d2b59"/>
+      <stop offset="1" stop-color="#1f6ecf"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="24" fill="url(#g)"/>
+  <path d="M100 34l46 19v33c0 33-21 62-46 74-25-12-46-41-46-74V53l46-19z" fill="#f6c453"/>
+  <path d="M100 52l30 12v21c0 22-13 42-30 52-17-10-30-30-30-52V64l30-12z" fill="#11376f"/>
+  <text x="100" y="151" text-anchor="middle" fill="#ffffff" font-size="20" font-family="Arial, sans-serif" font-weight="700">AV</text>
+</svg>

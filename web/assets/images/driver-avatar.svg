@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Driver avatar">
+  <rect width="120" height="120" fill="#d8e3f2"/>
+  <circle cx="60" cy="42" r="22" fill="#f1c9a4"/>
+  <path d="M22 108c5-22 20-34 38-34s33 12 38 34" fill="#2d4a72"/>
+  <path d="M39 36c2-14 11-22 21-22s19 8 21 22" fill="#1e3350"/>
+</svg>
