@@ -1,71 +1,132 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+
 <!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
     <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <meta charset="UTF-8">
         <title>Staff | Manage Fleet</title>
+
         <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
     </head>
+
     <body class="bg-gray-50 font-sans">
-        <jsp:include page="/partials/sidebar.jsp"><jsp:param name="active" value="fleet" /></jsp:include>
-            <main class="pl-64 min-h-screen">
+
+        <jsp:include page="/partials/sidebar.jsp">
+            <jsp:param name="active" value="fleet" />
+        </jsp:include>
+
+        <main class="pl-64 min-h-screen">
+
             <jsp:include page="/partials/navbar.jsp" />
+
             <div class="p-8 mt-16">
+
+                <!-- HEADER -->
                 <div class="flex justify-between items-center mb-6">
+
                     <div>
                         <h1 class="text-2xl font-bold text-gray-800">Vehicle Inventory</h1>
-                        <p class="text-gray-500">Manage campus fleet units and availability.</p>
+                        <p class="text-gray-500">Manage campus fleet units</p>
                     </div>
-                    <a href="addVehicle.jsp" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition">
-                        <span class="material-symbols-outlined text-sm">add</span> Add Vehicle
+
+                    <!-- ADD BUTTON (FIXED) -->
+                    <a href="addVehicle.jsp"
+                       class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700">
+                        <span class="material-symbols-outlined text-sm">add</span>
+                        Add Vehicle
                     </a>
+
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-50 text-gray-600 text-sm uppercase">
+                <!-- SUCCESS -->
+                <c:if test="${param.success == 'true'}">
+                    <div class="bg-green-100 text-green-700 p-3 rounded mb-4">
+                        Vehicle added successfully!
+                    </div>
+                </c:if>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow border overflow-hidden">
+
+                    <table class="w-full text-left">
+
+                        <thead class="bg-gray-50 text-sm text-gray-600 uppercase">
                             <tr>
-                                <th class="p-4 border-b">Plate Number</th>
-                                <th class="p-4 border-b">Type</th>
-                                <th class="p-4 border-b">Capacity</th>
-                                <th class="p-4 border-b">Status</th>
-                                <th class="p-4 border-b text-right">Actions</th>
+                                <th class="p-4">Plate</th>
+                                <th class="p-4">Type</th>
+                                <th class="p-4">Capacity</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
+
+                        <tbody>
+
                             <c:forEach var="vehicle" items="${vehicleList}">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="p-4 font-semibold text-blue-600">${vehicle.licensePlate}</td>
-                                    <td class="p-4 text-sm text-gray-700">${vehicle.type}</td>
-                                    <td class="p-4 text-sm text-gray-700">${vehicle.capacity} Pax</td>
+
+                                <tr class="border-t hover:bg-gray-50">
+
+                                    <td class="p-4 font-semibold text-blue-600">
+                                        ${vehicle.licensePlate}
+                                    </td>
+
                                     <td class="p-4">
-                                        <span class="px-3 py-1 rounded-full text-[11px] font-bold 
-                                              ${vehicle.status == 'AVAILABLE' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
-                                            ${vehicle.status}
-                                        </span>
+                                        ${vehicle.type}
                                     </td>
-                                    <td class="p-4 text-right flex justify-end gap-3 text-gray-400">
-                                        <a href="editVehicle.jsp?id=${vehicle.id}" class="material-symbols-outlined hover:text-blue-600">edit_square</a>
-                                        <button class="material-symbols-outlined hover:text-red-500">delete</button>
+
+                                    <td class="p-4">
+                                        ${vehicle.capacity}
                                     </td>
+
+                                    <td class="p-4">
+                                        ${vehicle.status}
+                                    </td>
+
+                                    <!-- ACTION BUTTONS -->
+                                    <td class="p-4 text-right flex justify-end gap-3">
+
+                                        <!-- EDIT -->
+                                        <a href="editVehicle.jsp?id=${vehicle.id}"
+                                           class="material-symbols-outlined text-gray-500 hover:text-blue-600">
+                                            edit_square
+                                        </a>
+
+                                        <!-- DELETE (UI only for now) -->
+                                        <button onclick="return confirm('Delete this vehicle?')"
+                                                class="material-symbols-outlined text-gray-500 hover:text-red-500">
+                                            delete
+                                        </button>
+
+                                    </td>
+
                                 </tr>
+
                             </c:forEach>
+
+                            <!-- EMPTY -->
                             <c:if test="${empty vehicleList}">
                                 <tr>
-                                    <td colspan="5" class="p-12 text-center text-gray-400">
-                                        <span class="material-symbols-outlined text-4xl block mb-2">directions_car</span>
-                                        No vehicles found. Start by adding one.
+                                    <td colspan="5" class="p-10 text-center text-gray-400">
+                                        No vehicles found.
+                                        <br><br>
+                                        <a href="addVehicle.jsp" class="text-blue-600 font-semibold">
+                                            Add your first vehicle
+                                        </a>
                                     </td>
                                 </tr>
                             </c:if>
+
                         </tbody>
                     </table>
+
                 </div>
+
             </div>
+
         </main>
+
     </body>
 </html>
