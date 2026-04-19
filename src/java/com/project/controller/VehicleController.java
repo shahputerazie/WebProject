@@ -2,8 +2,8 @@ package com.project.controller;
 
 import com.project.dao.VehicleDAO;
 import com.project.model.Vehicle;
-
 import java.io.IOException;
+import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
@@ -14,71 +14,47 @@ public class VehicleController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
         String action = request.getParameter("action");
+        String statusFilter = request.getParameter("status");
+        VehicleDAO dao = new VehicleDAO();
 
         if (action == null || action.equals("list")) {
-            listVehicles(request, response);
-        } else {
-            response.sendRedirect("fleetList.jsp?error=invalid_action");
+            List<Vehicle> list = (statusFilter != null) ? dao.getVehiclesByStatus(statusFilter) : dao.getAllVehicles();
+            request.setAttribute("vehicleList", list);
+            request.getRequestDispatcher("/pages/staff/fleetList.jsp").forward(request, response);
+        } else if (action.equals("edit")) {
+            int id = Integer.parseInt(request.getParameter("id"));
+            request.setAttribute("vehicle", dao.getVehicleById(id));
+            request.getRequestDispatcher("/pages/staff/editVehicle.jsp").forward(request, response);
+        } else if (action.equals("delete")) {
+            dao.deleteVehicle(Integer.parseInt(request.getParameter("id")));
+            response.sendRedirect("VehicleController?action=list&deleted=true");
         }
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
         String action = request.getParameter("action");
-
-        if (action == null) {
-            response.sendRedirect("VehicleController?action=list&error=missing_action");
-            return;
-        }
-
-        switch (action) {
-            case "create":
-                createVehicle(request, response);
-                break;
-
-            default:
-                response.sendRedirect("VehicleController?action=list&error=invalid_action");
-        }
-    }
-
-    // ===================== LIST VEHICLES =====================
-    private void listVehicles(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-
         VehicleDAO dao = new VehicleDAO();
-        request.setAttribute("vehicleList", dao.getAllVehicles());
 
-        request.getRequestDispatcher("fleetList.jsp").forward(request, response);
-    }
+        String plate = request.getParameter("licensePlate");
+        String type = request.getParameter("type");
+        int cap = Integer.parseInt(request.getParameter("capacity"));
+        String status = request.getParameter("status");
 
-    // ===================== CREATE VEHICLE =====================
-    private void createVehicle(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
+        boolean success;
+        if ("update".equals(action)) {
+            int id = Integer.parseInt(request.getParameter("id"));
+            success = dao.updateVehicle(new Vehicle(id, plate, type, cap, status));
+        } else {
+            success = dao.addVehicle(new Vehicle(plate, type, cap, status));
+        }
 
-        try {
-            String licensePlate = request.getParameter("licensePlate");
-            String type = request.getParameter("type");
-            int capacity = Integer.parseInt(request.getParameter("capacity"));
-            String status = request.getParameter("status");
-
-            Vehicle v = new Vehicle(0, licensePlate, type, capacity, status);
-
-            VehicleDAO dao = new VehicleDAO();
-            boolean success = dao.addVehicle(v);
-
-            if (success) {
-                response.sendRedirect("VehicleController?action=list&success=true");
-            } else {
-                response.sendRedirect("addVehicle.jsp?error=db_failed");
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            response.sendRedirect("addVehicle.jsp?error=exception");
+        if (success) {
+            response.sendRedirect("VehicleController?action=list&success=true");
+        } else {
+            response.sendRedirect("pages/staff/addVehicle.jsp?error=true");
         }
     }
 }
