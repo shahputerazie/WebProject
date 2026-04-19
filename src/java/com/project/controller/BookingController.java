@@ -33,6 +33,10 @@ public class BookingController extends HttpServlet {
             updateBooking(request, response);
             return;
         }
+        if ("cancel".equalsIgnoreCase(action)) {
+            cancelBooking(request, response);
+            return;
+        }
         submitBooking(request, response);
     }
 
@@ -82,7 +86,7 @@ public class BookingController extends HttpServlet {
             boolean isAdded = dao.addBooking(newBooking);
 
             if (isAdded) {
-                response.sendRedirect(request.getContextPath() + "/pages/user/userDashboard.jsp?success=true");
+                response.sendRedirect(request.getContextPath() + "/pages/user/bookingRequest.jsp?success=created");
             } else {
                 response.sendRedirect(request.getContextPath() + "/pages/user/bookingRequest.jsp?error=db");
             }
@@ -182,6 +186,41 @@ public class BookingController extends HttpServlet {
             }
         } catch (IllegalArgumentException ex) {
             response.sendRedirect(request.getContextPath() + "/SubmitBooking?action=detail&id=" + bookingId + "&error=invalid_input");
+        }
+    }
+
+    private void cancelBooking(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        Long userId = getCurrentUserId(request);
+        Long bookingId = parseBookingId(request.getParameter("id"));
+
+        if (bookingId == null) {
+            response.sendRedirect(request.getContextPath() + "/pages/user/bookingRequest.jsp?error=invalid_id");
+            return;
+        }
+
+        BookingDAO dao = new BookingDAO();
+        BookingRequest existingBooking = userId == null
+                ? dao.getBookingById(bookingId)
+                : dao.getBookingByIdAndUserId(bookingId, userId);
+        if (existingBooking == null) {
+            response.sendRedirect(request.getContextPath() + "/pages/user/bookingRequest.jsp?error=not_found");
+            return;
+        }
+
+        if (existingBooking.getStatus() != BookingRequest.Status.PENDING) {
+            response.sendRedirect(request.getContextPath() + "/SubmitBooking?action=detail&id=" + bookingId + "&error=readonly");
+            return;
+        }
+
+        boolean isCancelled = userId == null
+                ? dao.cancelPendingBooking(bookingId)
+                : dao.cancelPendingBookingForUser(bookingId, userId);
+
+        if (isCancelled) {
+            response.sendRedirect(request.getContextPath() + "/pages/user/bookingRequest.jsp?success=cancelled");
+        } else {
+            response.sendRedirect(request.getContextPath() + "/SubmitBooking?action=detail&id=" + bookingId + "&error=cancel_failed");
         }
     }
 

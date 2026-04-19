@@ -169,6 +169,37 @@ public class BookingDAO {
         return isSuccess;
     }
 
+    public boolean cancelPendingBooking(long bookingId) {
+        boolean isSuccess = false;
+        String query = "UPDATE bookings SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'";
+
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setLong(1, bookingId);
+            isSuccess = pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return isSuccess;
+    }
+
+    public boolean cancelPendingBookingForUser(long bookingId, long userId) {
+        boolean isSuccess = false;
+        String query = "UPDATE bookings SET status = 'CANCELLED' WHERE id = ? AND user_id = ? AND status = 'PENDING'";
+
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setLong(1, bookingId);
+            pstmt.setLong(2, userId);
+            isSuccess = pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return isSuccess;
+    }
+
     private BookingRequest mapBooking(ResultSet rs) throws Exception {
         BookingRequest booking = new BookingRequest();
         booking.setId(rs.getLong("id"));

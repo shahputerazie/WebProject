@@ -25,6 +25,13 @@
             currentUserId = null;
         }
     }
+    if (currentUserId == null) {
+        currentUserId = 1001L;
+        session.setAttribute("userId", currentUserId);
+    }
+
+    String error = request.getParameter("error");
+    String success = request.getParameter("success");
 
     BookingDAO bookingDAO = new BookingDAO();
     List<BookingRequest> bookings = currentUserId == null
@@ -53,7 +60,7 @@
     <head>
         <meta charset="utf-8"/>
         <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-        <title>Campus Vehicle Booking System | Module 3: Booking Request Management</title>
+        <title>Campus Vehicle Booking System | Booking Request Management</title>
         <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
         <script src="${pageContext.request.contextPath}/assets/js/tailwind.config.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
@@ -75,6 +82,29 @@
                         <p class="text-on-surface-variant mt-1">Submitting, tracking, modifying, and cancelling trip requests.</p>
                     </div>
                 </section>
+
+                <% if ("created".equals(success)) { %>
+                <section class="rounded-lg border border-green-200 bg-green-50 text-green-700 px-4 py-3 text-sm font-medium">
+                    Booking request created successfully.
+                </section>
+                <% } else if ("cancelled".equals(success)) { %>
+                <section class="rounded-lg border border-green-200 bg-green-50 text-green-700 px-4 py-3 text-sm font-medium">
+                    Booking request cancelled successfully.
+                </section>
+                <% } %>
+                <% if ("auth_required".equals(error)) { %>
+                <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
+                    Unable to submit booking because user session is missing. A demo user has been assigned automatically. Try submitting again.
+                </section>
+                <% } else if ("missing_fields".equals(error) || "invalid_input".equals(error)) { %>
+                <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
+                    Please provide valid values for all required fields.
+                </section>
+                <% } else if ("db".equals(error)) { %>
+                <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
+                    Booking could not be saved to database. Check DB connection settings in `DBConnection.java`.
+                </section>
+                <% } %>
 
                 <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
@@ -190,6 +220,11 @@
                                     <td class="px-6 py-4 text-right space-x-2">
                                         <% if ("PENDING".equals(statusLabel)) { %>
                                         <a href="${pageContext.request.contextPath}/SubmitBooking?action=detail&id=<%= booking.getId() %>" class="inline-block px-3 py-1.5 rounded-md text-xs font-semibold bg-primary text-white hover:bg-primary-fixed-dim">Modify</a>
+                                        <form action="${pageContext.request.contextPath}/SubmitBooking" method="POST" class="inline-block" onsubmit="return confirm('Cancel this booking request?');">
+                                            <input type="hidden" name="action" value="cancel"/>
+                                            <input type="hidden" name="id" value="<%= booking.getId() %>"/>
+                                            <button type="submit" class="inline-block px-3 py-1.5 rounded-md text-xs font-semibold bg-error text-white hover:opacity-90">Cancel</button>
+                                        </form>
                                         <% } else { %>
                                         <a href="${pageContext.request.contextPath}/SubmitBooking?action=detail&id=<%= booking.getId() %>" class="inline-block px-3 py-1.5 rounded-md text-xs font-semibold bg-surface-container-high hover:bg-surface-container-highest">View</a>
                                         <% } %>
