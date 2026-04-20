@@ -19,8 +19,7 @@ public class BookingDAO {
         String query = "INSERT INTO bookings (user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
 
             pstmt.setLong(1, booking.getUserId());
             pstmt.setDate(2, java.sql.Date.valueOf(booking.getTripDate()));
@@ -44,9 +43,7 @@ public class BookingDAO {
         String query = "SELECT id, user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status "
                 + "FROM bookings ORDER BY created_at DESC, id DESC";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query);
-                ResultSet rs = pstmt.executeQuery()) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query); ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 bookings.add(mapBooking(rs));
@@ -63,8 +60,7 @@ public class BookingDAO {
         String query = "SELECT id, user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status "
                 + "FROM bookings WHERE user_id = ? ORDER BY created_at DESC, id DESC";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, userId);
 
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -84,8 +80,7 @@ public class BookingDAO {
         String query = "SELECT id, user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status "
                 + "FROM bookings WHERE id = ?";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, id);
 
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -105,8 +100,7 @@ public class BookingDAO {
         String query = "SELECT id, user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status "
                 + "FROM bookings WHERE id = ? AND user_id = ?";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, id);
             pstmt.setLong(2, userId);
 
@@ -122,13 +116,38 @@ public class BookingDAO {
         return booking;
     }
 
+    public boolean updateBookingStatus(long id, String status) {
+        String query = "UPDATE bookings SET status = ?, updated_at = NOW() WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, status);
+            pstmt.setLong(2, id);
+            return pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+// Logic to generate a unique code: BR-2026-001
+    public String generateRequestCode() {
+        String query = "SELECT COUNT(*) FROM bookings";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query); ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                int count = rs.getInt(1) + 1;
+                return "BR-" + java.time.Year.now().getValue() + "-" + String.format("%03d", count);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "BR-TEMP-" + System.currentTimeMillis();
+    }
+
     public boolean updatePendingBooking(BookingRequest booking) {
         boolean isSuccess = false;
         String query = "UPDATE bookings SET trip_date = ?, return_date = ?, destination = ?, passenger_count = ?, "
                 + "vehicle_type = ?, purpose = ? WHERE id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setDate(1, java.sql.Date.valueOf(booking.getTripDate()));
             pstmt.setDate(2, java.sql.Date.valueOf(booking.getReturnDate()));
             pstmt.setString(3, booking.getDestination());
@@ -150,8 +169,7 @@ public class BookingDAO {
         String query = "UPDATE bookings SET trip_date = ?, return_date = ?, destination = ?, passenger_count = ?, "
                 + "vehicle_type = ?, purpose = ? WHERE id = ? AND user_id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setDate(1, java.sql.Date.valueOf(booking.getTripDate()));
             pstmt.setDate(2, java.sql.Date.valueOf(booking.getReturnDate()));
             pstmt.setString(3, booking.getDestination());
