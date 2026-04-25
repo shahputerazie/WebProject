@@ -4,12 +4,12 @@ import java.io.Serializable;
 
 public class User implements Serializable {
 
-    // Attributes from the Data Model Class Diagram [cite: 114, 116, 117, 122, 123, 120, 124]
-    private int userId;           // PK
+    // Attributes aligned with DB Schema
+    private String userId;      // PK (Supports S75034)
     private String name;
-    private String email;          // Unique
+    private String email;
     private String passwordHash;
-    private int roleId;            // FK to Role
+    private int roleId;         // FK to Role
     private String phone;
     private boolean isActive;
 
@@ -17,8 +17,8 @@ public class User implements Serializable {
     public User() {
     }
 
-    // Parameterized Constructor for easier instantiation
-    public User(int userId, String name, String email, String passwordHash, int roleId, String phone, boolean isActive) {
+    // Fixed Parameterized Constructor: userId changed from int to String
+    public User(String userId, String name, String email, String passwordHash, int roleId, String phone, boolean isActive) {
         this.userId = userId;
         this.name = name;
         this.email = email;
@@ -28,12 +28,12 @@ public class User implements Serializable {
         this.isActive = isActive;
     }
 
-    // Getters and Setters [cite: 111]
-    public int getUserId() {
+    // Fixed Getters and Setters for userId
+    public String getUserId() {
         return userId;
     }
 
-    public void setUserId(int userId) {
+    public void setUserId(String userId) {
         this.userId = userId;
     }
 
@@ -53,12 +53,23 @@ public class User implements Serializable {
         this.email = email;
     }
 
+    // Unified Password methods to work with your DAO
     public String getPasswordHash() {
         return passwordHash;
     }
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+    
+    // Alias for getPasswordHash to satisfy UserDAO.java
+    public String getPassword() {
+        return passwordHash;
+    }
+
+    // Alias for setPasswordHash to satisfy UserDAO.java
+    public void setPassword(String password) {
+        this.passwordHash = password;
     }
 
     public int getRoleId() {
@@ -77,29 +88,20 @@ public class User implements Serializable {
         this.phone = phone;
     }
 
-    public boolean isIsActive() {
+    public boolean isActive() {
         return isActive;
     }
 
-    public void setIsActive(boolean isActive) {
+    public void setActive(boolean isActive) {
         this.isActive = isActive;
     }
 
-    /**
-     * Requirement: validatePassword(p: String): Boolean [cite: 121] In a real
-     * application, you would compare the provided string with the hash.
-     */
+    // Custom logic methods
     public boolean validatePassword(String password) {
-        // Basic implementation: replace with BCrypt or MD5 check as per your security needs
         return this.passwordHash != null && this.passwordHash.equals(password);
     }
 
-    /**
-     * Requirement: updateProfile() [cite: 126] This can be used to encapsulate
-     * profile update logic if needed.
-     */
     public void updateProfile() {
-        // Logic for internal state updates before saving to DAO
         System.out.println("Updating profile for: " + this.name);
     }
 }

@@ -6,38 +6,20 @@ import java.sql.SQLException;
 
 public class DBConnection {
 
-    private static final String URL
-            = getConfig("DB_URL", "jdbc:mysql://localhost:3306/campus_vehicle_booking");
+    private static final String URL =
+            "jdbc:mysql://localhost:3307/campus_vehicle_booking?useSSL=false&serverTimezone=UTC";
 
-    private static final String USER
-            = getConfig("DB_USER", "root");
+    private static final String USER = "root";
+    private static final String PASSWORD = "";
 
-    private static final String PASSWORD
-            = getConfig("DB_PASSWORD", "");
-
-    public static Connection getConnection() throws SQLException, ClassNotFoundException {
-
+    public static Connection getConnection() throws SQLException {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+            System.out.println("CONNECTED TO DB: " + conn.getCatalog());
+            return conn;
         } catch (ClassNotFoundException e) {
-            throw new ClassNotFoundException("MySQL JDBC Driver not found!", e);
+            throw new RuntimeException("MySQL JDBC Driver not found!", e);
         }
-
-        return DriverManager.getConnection(URL, USER, PASSWORD);
-    }
-
-    private static String getConfig(String key, String defaultValue) {
-
-        String envValue = System.getenv(key);
-        if (envValue != null && !envValue.trim().isEmpty()) {
-            return envValue;
-        }
-
-        String propValue = System.getProperty(key);
-        if (propValue != null && !propValue.trim().isEmpty()) {
-            return propValue;
-        }
-
-        return defaultValue;
     }
 }
