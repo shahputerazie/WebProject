@@ -9,13 +9,20 @@ public class VehicleDAO {
 
     public boolean addVehicle(Vehicle v) {
         String sql = "INSERT INTO vehicles (license_plate, type, capacity, status) VALUES (?, ?, ?, ?)";
+
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setString(1, v.getLicensePlate());
             ps.setString(2, v.getType());
             ps.setInt(3, v.getCapacity());
             ps.setString(4, v.getStatus());
+
+            System.out.println("Trying to insert vehicle: " + v.getLicensePlate());
+
             return ps.executeUpdate() > 0;
+
         } catch (Exception e) {
+            System.out.println("ADD VEHICLE ERROR: " + e.getMessage());
             e.printStackTrace();
             return false;
         }

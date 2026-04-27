@@ -24,7 +24,7 @@
                 </div>
             </c:if>
 
-            <form action="LoginController" method="POST" class="bg-white p-8 rounded-2xl shadow-sm border space-y-5">
+            <form action="${pageContext.request.contextPath}/LoginController" method="POST" class="bg-white p-8 rounded-2xl shadow-sm border space-y-5">
                 <div>
                     <label class="block text-sm font-semibold mb-2">University Email</label>
                     <input type="email" name="email" 

@@ -5,10 +5,8 @@ import com.project.model.Vehicle;
 import java.io.IOException;
 import java.util.List;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
 
-@WebServlet("/VehicleController")
 public class VehicleController extends HttpServlet {
 
     @Override
@@ -20,7 +18,7 @@ public class VehicleController extends HttpServlet {
 
         if (action == null || action.equals("list")) {
             List<Vehicle> list = (statusFilter != null) ? dao.getVehiclesByStatus(statusFilter) : dao.getAllVehicles();
-            request.setAttribute("vehicleList", list);
+            request.setAttribute("vehicles", list);
             request.getRequestDispatcher("/pages/staff/fleetList.jsp").forward(request, response);
         } else if (action.equals("edit")) {
             int id = Integer.parseInt(request.getParameter("id"));
@@ -35,8 +33,24 @@ public class VehicleController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+
+        System.out.println("=== VEHICLE CONTROLLER DO POST CALLED ===");
+        System.out.println("ACTION = " + request.getParameter("action"));
+
         String action = request.getParameter("action");
         VehicleDAO dao = new VehicleDAO();
+
+        if ("delete".equals(action)) {
+            int id = Integer.parseInt(request.getParameter("id"));
+            boolean success = dao.deleteVehicle(id);
+
+            if (success) {
+                response.sendRedirect("VehicleController?action=list&success=true");
+            } else {
+                response.sendRedirect("VehicleController?action=list&error=true");
+            }
+            return;
+        }
 
         String plate = request.getParameter("licensePlate");
         String type = request.getParameter("type");
@@ -44,6 +58,7 @@ public class VehicleController extends HttpServlet {
         String status = request.getParameter("status");
 
         boolean success;
+
         if ("update".equals(action)) {
             int id = Integer.parseInt(request.getParameter("id"));
             success = dao.updateVehicle(new Vehicle(id, plate, type, cap, status));
