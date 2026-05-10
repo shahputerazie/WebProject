@@ -22,7 +22,7 @@
                     class="w-full h-full object-contain"
                     alt="University Malaysia Terengganu crest"
                     src="${pageContext.request.contextPath}/assets/images/Logo_Rasmi_UMT.png"
-                />
+                    />
             </div>
 
             <div>
@@ -37,20 +37,32 @@
     </div>
 
     <nav class="flex-1 space-y-2">
-        <a class="<%= "dashboard".equals(active) ? activeClass : inactiveClass %>"
+
+        <!-- Dashboard -->
+        <a class="<%= "dashboard".equals(active) ? activeClass : inactiveClass%>"
            href="${pageContext.request.contextPath}/pages/user/userDashboard.jsp">
             <span class="material-symbols-outlined">dashboard</span>
             <span class="font-medium">Dashboard</span>
         </a>
 
-        <a class="<%= "booking".equals(active) ? activeClass : inactiveClass %>"
+        <!-- Booking Requests -->
+        <a class="<%= "booking".equals(active) ? activeClass : inactiveClass%>"
            href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp">
             <span class="material-symbols-outlined">event_note</span>
             <span class="font-medium">Booking Requests</span>
         </a>
+
+        <!-- Fleet Management -->
+        <a class="<%= "fleet".equals(active) ? activeClass : inactiveClass%>"
+           href="${pageContext.request.contextPath}/VehicleController?action=list">
+            <span class="material-symbols-outlined">directions_car</span>
+            <span class="font-medium">Fleet Management</span>
+        </a>
+
     </nav>
 
     <div class="mt-auto px-4 pt-6 pb-6 border-t border-white/5 flex flex-col gap-4">
+
         <a class="block text-center w-full bg-gradient-to-r from-primary to-surface-tint text-white py-3 rounded-xl font-bold text-sm tracking-tight hover:scale-95 duration-150 ease-in-out shadow-md"
            href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp">
             New Booking
@@ -61,6 +73,7 @@
                 class="block text-center w-full bg-red-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-red-600 transition shadow-md">
             Logout
         </button>
+
     </div>
 
     <!-- Logout Modal -->
@@ -68,17 +81,21 @@
          class="hidden fixed inset-0 bg-black/50 z-[999] flex items-center justify-center">
 
         <div class="bg-white rounded-2xl shadow-xl w-80 p-6 text-center">
+
             <div class="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
                 <span class="material-symbols-outlined text-red-600">logout</span>
             </div>
 
-            <h2 class="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h2>
+            <h2 class="text-lg font-bold text-gray-900 mb-2">
+                Confirm Logout
+            </h2>
 
             <p class="text-sm text-gray-500 mb-6">
                 Are you sure you want to logout?
             </p>
 
             <div class="flex gap-3">
+
                 <button type="button"
                         onclick="closeLogoutModal()"
                         class="flex-1 py-2 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-100">
@@ -89,8 +106,11 @@
                    class="flex-1 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600">
                     Logout
                 </a>
+
             </div>
+
         </div>
+
     </div>
 
     <script>

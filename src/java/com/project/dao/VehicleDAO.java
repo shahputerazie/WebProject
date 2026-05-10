@@ -9,13 +9,20 @@ public class VehicleDAO {
 
     public boolean addVehicle(Vehicle v) {
         String sql = "INSERT INTO vehicles (license_plate, type, capacity, status) VALUES (?, ?, ?, ?)";
+
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setString(1, v.getLicensePlate());
             ps.setString(2, v.getType());
             ps.setInt(3, v.getCapacity());
             ps.setString(4, v.getStatus());
+
+            System.out.println("Trying to insert vehicle: " + v.getLicensePlate());
+
             return ps.executeUpdate() > 0;
+
         } catch (Exception e) {
+            System.out.println("ADD VEHICLE ERROR: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -90,5 +97,40 @@ public class VehicleDAO {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public List<Vehicle> searchVehicles(String keyword, String type, String status) {
+        List<Vehicle> list = new ArrayList<>();
+
+        String sql = "SELECT * FROM vehicles WHERE license_plate LIKE ? "
+                + "AND (? = '' OR type = ?) "
+                + "AND (? = '' OR status = ?) "
+                + "ORDER BY id DESC";
+
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, "%" + keyword + "%");
+            ps.setString(2, type);
+            ps.setString(3, type);
+            ps.setString(4, status);
+            ps.setString(5, status);
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                list.add(new Vehicle(
+                        rs.getInt("id"),
+                        rs.getString("license_plate"),
+                        rs.getString("type"),
+                        rs.getInt("capacity"),
+                        rs.getString("status")
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return list;
     }
 }
