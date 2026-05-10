@@ -75,6 +75,10 @@
                 <div class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
                     Unable to update this booking. It may have changed status.
                 </div>
+                <% } else if ("cancel_failed".equals(error)) { %>
+                <div class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
+                    Unable to cancel this booking. It may have changed status.
+                </div>
                 <% } %>
 
                 <section class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/10">
@@ -115,6 +119,11 @@
                         <div class="md:col-span-2 flex justify-end gap-3 pt-1">
                             <a href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp" class="px-5 py-2.5 rounded-md border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors">Back to List</a>
                             <% if (canModify) { %>
+                            <form action="${pageContext.request.contextPath}/SubmitBooking" method="POST" class="inline-block" onsubmit="return confirm('Cancel this booking request?');">
+                                <input type="hidden" name="action" value="cancel"/>
+                                <input type="hidden" name="id" value="<%= booking.getId() %>"/>
+                                <button type="submit" class="px-5 py-2.5 rounded-md bg-error text-white font-semibold hover:opacity-90">Cancel Request</button>
+                            </form>
                             <button type="submit" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-primary to-surface-tint text-white font-semibold">Save Changes</button>
                             <% } %>
                         </div>
