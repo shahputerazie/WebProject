@@ -12,19 +12,43 @@ public class VehicleController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+
         String action = request.getParameter("action");
-        String statusFilter = request.getParameter("status");
         VehicleDAO dao = new VehicleDAO();
 
         if (action == null || action.equals("list")) {
-            List<Vehicle> list = (statusFilter != null) ? dao.getVehiclesByStatus(statusFilter) : dao.getAllVehicles();
+
+            String keyword = request.getParameter("keyword");
+            String type = request.getParameter("type");
+            String status = request.getParameter("status");
+
+            if (keyword == null) {
+                keyword = "";
+            }
+            if (type == null) {
+                type = "";
+            }
+            if (status == null) {
+                status = "";
+            }
+
+            keyword = keyword.trim();
+            type = type.trim();
+            status = status.trim();
+
+            List<Vehicle> list = dao.searchVehicles(keyword, type, status);
+
             request.setAttribute("vehicles", list);
             request.getRequestDispatcher("/pages/staff/fleetList.jsp").forward(request, response);
+
         } else if (action.equals("edit")) {
+
             int id = Integer.parseInt(request.getParameter("id"));
             request.setAttribute("vehicle", dao.getVehicleById(id));
             request.getRequestDispatcher("/pages/staff/editVehicle.jsp").forward(request, response);
+
         } else if (action.equals("delete")) {
+
             dao.deleteVehicle(Integer.parseInt(request.getParameter("id")));
             response.sendRedirect("VehicleController?action=list&deleted=true");
         }
