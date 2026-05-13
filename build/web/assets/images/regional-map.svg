@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Regional distribution map">
+  <rect width="800" height="500" fill="#e8edf4"/>
+  <path d="M72 350l120-160 180 40 130-90 220 70-50 180-240 40-180-50z" fill="#93aac6"/>
+  <path d="M110 320l140-90 140 30 90-60 170 60-30 110-190 30-140-40z" fill="#5d7696"/>
+  <circle cx="260" cy="270" r="12" fill="#0b315f"/>
+  <circle cx="470" cy="240" r="12" fill="#0b315f"/>
+  <circle cx="560" cy="310" r="12" fill="#0b315f"/>
+</svg>
