@@ -6,6 +6,14 @@
 
     String activeClass = "flex items-center gap-3 bg-blue-400/20 text-white rounded-full px-4 py-3 font-semibold";
     String inactiveClass = "flex items-center gap-3 text-blue-200/70 hover:text-white px-4 py-3 transition-colors hover:bg-blue-400/10 transition-all duration-200";
+    
+    // Get roleId from session
+    Object roleObj = session.getAttribute("roleId");
+    int roleId = (roleObj instanceof Integer) ? (Integer) roleObj : 0;
+
+    String dashboardUrl = (roleId == 1 || roleId == 3) 
+                           ? "/pages/admin/adminDashboard.jsp" 
+                           : "/pages/user/userDashboard.jsp";
 %>
 
 <!-- SideNavBar -->
@@ -40,14 +48,14 @@
 
         <!-- Dashboard -->
         <a class="<%= "dashboard".equals(active) ? activeClass : inactiveClass%>"
-           href="${pageContext.request.contextPath}/pages/user/userDashboard.jsp">
+           href="${pageContext.request.contextPath}<%= dashboardUrl %>">
             <span class="material-symbols-outlined">dashboard</span>
             <span class="font-medium">Dashboard</span>
         </a>
 
         <!-- Booking Requests -->
         <a class="<%= "booking".equals(active) ? activeClass : inactiveClass%>"
-           href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp">
+           href="${pageContext.request.contextPath}/BookingController">
             <span class="material-symbols-outlined">event_note</span>
             <span class="font-medium">Booking Requests</span>
         </a>
@@ -64,7 +72,7 @@
     <div class="mt-auto px-4 pt-6 pb-6 border-t border-white/5 flex flex-col gap-4">
 
         <a class="block text-center w-full bg-gradient-to-r from-primary to-surface-tint text-white py-3 rounded-xl font-bold text-sm tracking-tight hover:scale-95 duration-150 ease-in-out shadow-md"
-           href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp">
+           href="${pageContext.request.contextPath}/BookingController">
             New Booking
         </a>
 
