@@ -17,8 +17,10 @@ public class RoleFilter implements Filter {
 
         HttpSession session = request.getSession(false);
         Object roleObj = (session != null) ? session.getAttribute("roleId") : null;
+        
+        Integer roleId = (roleObj instanceof Integer) ? (Integer) roleObj : null;
 
-        if (!(roleObj instanceof Integer) || ((Integer) roleObj) != 3) {
+        if (roleId == null || (roleId != 1 && roleId != 3)) {
             response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
             return;
         }

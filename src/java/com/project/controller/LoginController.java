@@ -36,14 +36,14 @@ public class LoginController extends HttpServlet {
         int roleId = user.getRoleId();
 
         // STAFF/ADMIN login page only allows admin role
-        if ("staff".equals(loginType) && roleId != 3) {
+        if ("staff".equals(loginType) && (roleId != 3 && roleId != 1)) {
             response.sendRedirect(request.getContextPath()
                     + "/pages/login/login.jsp?loginType=staff&error=invalidrole");
             return;
         }
 
         // OTHERS login page only allows student/lecturer
-        if ("others".equals(loginType) && roleId == 3) {
+        if ("others".equals(loginType) && (roleId == 3 && roleId == 1)) {
             response.sendRedirect(request.getContextPath()
                     + "/pages/login/login.jsp?loginType=others&error=invalidrole");
             return;
@@ -57,7 +57,7 @@ public class LoginController extends HttpServlet {
         session.setAttribute("email", user.getEmail());
         session.setAttribute("roleId", roleId);
 
-        if (roleId == 3) {
+        if (roleId == 3 || roleId == 1) {
             response.sendRedirect(request.getContextPath() + "/pages/admin/adminDashboard.jsp");
         } else {
             response.sendRedirect(request.getContextPath() + "/pages/user/userDashboard.jsp");
