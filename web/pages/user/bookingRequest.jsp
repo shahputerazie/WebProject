@@ -35,24 +35,24 @@
                     <p class="text-slate-500 mt-1">Submit and track your vehicle requests for Module 2.</p>
                 </section>
 
-                <% if ("created".equals(success)) { %>
+                <% if ("created".equals("success")) { %>
                 <section class="rounded-lg border border-green-200 bg-green-50 text-green-700 px-4 py-3 text-sm font-medium">
                     Booking request created successfully.
                 </section>
-                <% } else if ("cancelled".equals(success)) { %>
+                <% } else if ("cancelled".equals("success")) { %>
                 <section class="rounded-lg border border-green-200 bg-green-50 text-green-700 px-4 py-3 text-sm font-medium">
                     Booking request cancelled successfully.
                 </section>
                 <% } %>
-                <% if ("auth_required".equals(error)) { %>
+                <% if ("auth_required".equals("error")) { %>
                 <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
                     Unable to submit booking because user session is missing. A demo user has been assigned automatically. Try submitting again.
                 </section>
-                <% } else if ("missing_fields".equals(error) || "invalid_input".equals(error)) { %>
+                <% } else if ("missing_fields".equals("error") || "invalid_input".equals("error")) { %>
                 <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
                     Please provide valid values for all required fields.
                 </section>
-                <% } else if ("db".equals(error)) { %>
+                <% } else if ("db".equals("error")) { %>
                 <section class="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium">
                     Booking could not be saved to database. Check DB connection settings in `DBConnection.java`.
                 </section>
