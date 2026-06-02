@@ -1,6 +1,7 @@
 package com.project.dao;
 
 import com.project.model.User;
+import com.project.util.PasswordUtil;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,16 +11,15 @@ public class UserDAO {
     // ===================== LOGIN =====================
     public User login(String email, String password) {
         User user = null;
-        String sql = "SELECT * FROM users WHERE email = ? AND passwordHash = ? AND isActive = 1";
+        String sql = "SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND isActive = 1";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, email);
-            ps.setString(2, password);
 
             ResultSet rs = ps.executeQuery();
 
-            if (rs.next()) {
+            if (rs.next() && PasswordUtil.matches(password, rs.getString("passwordHash"))) {
                 user = mapResultSetToUser(rs);
             }
 
@@ -32,17 +32,16 @@ public class UserDAO {
 
     // ===================== REGISTER =====================
     public boolean registerUser(User user) {
-        String sql = "INSERT INTO users (userId, name, email, passwordHash, roleId, phone, isActive) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO users (name, email, passwordHash, role, phone, isActive) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, user.getUserId());
-            ps.setString(2, user.getName());
-            ps.setString(3, user.getEmail());
-            ps.setString(4, user.getPasswordHash());
-            ps.setInt(5, user.getRoleId());
-            ps.setString(6, user.getPhone());
-            ps.setBoolean(7, true);
+            ps.setString(1, user.getName());
+            ps.setString(2, user.getEmail());
+            ps.setString(3, user.getPasswordHash());
+            ps.setString(4, user.getRole());
+            ps.setString(5, user.getPhone());
+            ps.setBoolean(6, true);
 
             return ps.executeUpdate() > 0;
 
@@ -117,10 +116,11 @@ public class UserDAO {
     // ===================== CHANGE PASSWORD =====================
     public boolean changePassword(String userId, String newPassword) {
         String sql = "UPDATE users SET passwordHash = ? WHERE userId = ?";
+        String hashedPassword = PasswordUtil.hash(newPassword);
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, newPassword);
+            ps.setString(1, hashedPassword);
             ps.setString(2, userId);
 
             return ps.executeUpdate() > 0;
@@ -133,12 +133,12 @@ public class UserDAO {
     }
 
     // ===================== ADMIN UPDATE =====================
-    public boolean updateRoleAndStatus(String userId, int roleId, boolean isActive) {
-        String sql = "UPDATE users SET roleId = ?, isActive = ? WHERE userId = ?";
+    public boolean updateRoleAndStatus(String userId, String role, boolean isActive) {
+        String sql = "UPDATE users SET role = ?, isActive = ? WHERE userId = ?";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setInt(1, roleId);
+            ps.setString(1, role);
             ps.setBoolean(2, isActive);
             ps.setString(3, userId);
 
@@ -193,7 +193,7 @@ public class UserDAO {
         user.setName(rs.getString("name"));
         user.setEmail(rs.getString("email"));
         user.setPassword(rs.getString("passwordHash"));
-        user.setRoleId(rs.getInt("roleId"));
+        user.setRole(rs.getString("role"));
         user.setPhone(rs.getString("phone"));
         user.setActive(rs.getBoolean("isActive"));
 

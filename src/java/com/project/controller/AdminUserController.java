@@ -14,12 +14,12 @@ public class AdminUserController extends HttpServlet {
     private boolean isAdmin(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
 
-        if (session == null || session.getAttribute("roleId") == null) {
+        if (session == null || session.getAttribute("role") == null) {
             return false;
         }
 
-        int roleId = (int) session.getAttribute("roleId");
-        return roleId == 3;
+        String role = (String) session.getAttribute("role");
+        return "ADMIN".equals(role);
     }
 
     @Override
@@ -54,16 +54,24 @@ public class AdminUserController extends HttpServlet {
         boolean success = false;
 
         if ("modifyRole".equals(action)) {
-            int roleId = Integer.parseInt(request.getParameter("roleId"));
+            String role = request.getParameter("role");
+            if (!isAllowedRole(role)) {
+                response.sendRedirect(request.getContextPath() + "/AdminUserController?status=error");
+                return;
+            }
             boolean isActive = Boolean.parseBoolean(request.getParameter("isActive"));
-            success = dao.updateRoleAndStatus(userId, roleId, isActive);
+            success = dao.updateRoleAndStatus(userId, role, isActive);
 
         } else if ("deactivate".equals(action)) {
             success = dao.deactivateUser(userId);
 
         } else if ("activate".equals(action)) {
-            int roleId = Integer.parseInt(request.getParameter("roleId"));
-            success = dao.updateRoleAndStatus(userId, roleId, true);
+            String role = request.getParameter("role");
+            if (!isAllowedRole(role)) {
+                response.sendRedirect(request.getContextPath() + "/AdminUserController?status=error");
+                return;
+            }
+            success = dao.updateRoleAndStatus(userId, role, true);
         }
 
         if (success) {
@@ -71,5 +79,16 @@ public class AdminUserController extends HttpServlet {
         } else {
             response.sendRedirect(request.getContextPath() + "/AdminUserController?status=error");
         }
+    }
+
+    private boolean isAllowedRole(String role) {
+        if (role == null) {
+            return false;
+        }
+        String normalized = role.trim().toUpperCase();
+        return "ADMIN".equals(normalized)
+                || "STAFF".equals(normalized)
+                || "STUDENT".equals(normalized)
+                || "LECTURER".equals(normalized);
     }
 }

@@ -24,6 +24,17 @@
                     </div>
                 </div>
 
+                <c:if test="${param.status == 'success'}">
+                    <div class="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                        User record updated successfully.
+                    </div>
+                </c:if>
+                <c:if test="${param.status == 'error'}">
+                    <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        Update failed. Please try again.
+                    </div>
+                </c:if>
+
                 <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
                     <table class="w-full text-left">
                         <thead class="bg-gray-50 border-b">
@@ -35,34 +46,44 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y">
-                            <c:forEach var="u" items="${userList}">
+                            <c:forEach var="u" items="${users}">
                                 <tr>
                                     <td class="p-4">
                                         <div class="font-bold text-gray-800">${u.name}</div>
                                         <div class="text-xs text-gray-500">${u.email}</div>
                                     </td>
                                     <td class="p-4 text-sm">
-                                        <form action="AdminController" method="POST" class="flex gap-2">
-                                            <input type="hidden" name="action" value="updateRole">
+                                        <form action="${pageContext.request.contextPath}/AdminUserController" method="POST" class="flex gap-2">
+                                            <input type="hidden" name="action" value="modifyRole">
                                             <input type="hidden" name="userId" value="${u.userId}">
-                                            <select name="roleId" onchange="this.form.submit()" class="text-xs rounded-lg border-gray-300 py-1">
-                                                <option value="1" ${u.roleId == 1 ? 'selected' : ''}>Student</option>
-                                                <option value="2" ${u.roleId == 2 ? 'selected' : ''}>Lecturer</option>
-                                                <option value="3" ${u.roleId == 3 ? 'selected' : ''}>Staff/Admin</option>
+                                            <input type="hidden" name="isActive" value="${u.active}">
+                                            <select name="role" onchange="this.form.submit()" class="text-xs rounded-lg border-gray-300 py-1">
+                                                <option value="STUDENT" ${u.role eq 'STUDENT' ? 'selected' : ''}>Student</option>
+                                                <option value="LECTURER" ${u.role eq 'LECTURER' ? 'selected' : ''}>Lecturer</option>
+                                                <option value="STAFF" ${u.role eq 'STAFF' ? 'selected' : ''}>Staff</option>
+                                                <option value="ADMIN" ${u.role eq 'ADMIN' ? 'selected' : ''}>Admin</option>
                                             </select>
                                         </form>
                                     </td>
                                     <td class="p-4">
-                                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                            ${u.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                            ${u.active ? 'ACTIVE' : 'INACTIVE'}
                                         </span>
                                     </td>
                                     <td class="p-4 text-right">
-                                        <c:if test="${u.isActive}">
-                                            <form action="AdminController" method="POST" onsubmit="return confirm('Deactivate this account?')">
+                                        <c:if test="${u.active}">
+                                            <form action="${pageContext.request.contextPath}/AdminUserController" method="POST" onsubmit="return confirm('Deactivate this account?')">
                                                 <input type="hidden" name="action" value="deactivate">
                                                 <input type="hidden" name="userId" value="${u.userId}">
                                                 <button type="submit" class="text-red-500 hover:text-red-700 text-sm font-semibold">Deactivate</button>
+                                            </form>
+                                        </c:if>
+                                        <c:if test="${not u.active}">
+                                            <form action="${pageContext.request.contextPath}/AdminUserController" method="POST">
+                                                <input type="hidden" name="action" value="activate">
+                                                <input type="hidden" name="userId" value="${u.userId}">
+                                                <input type="hidden" name="role" value="${u.role}">
+                                                <button type="submit" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Activate</button>
                                             </form>
                                         </c:if>
                                     </td>

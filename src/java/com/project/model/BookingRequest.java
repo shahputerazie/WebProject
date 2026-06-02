@@ -10,7 +10,7 @@ public class BookingRequest {
     }
 
     public enum Status {
-        PENDING, APPROVED, REJECTED, CANCELLED
+        PENDING, APPROVED, REJECTED, COMPLETED, CANCELLED
     }
 
     private Long id;

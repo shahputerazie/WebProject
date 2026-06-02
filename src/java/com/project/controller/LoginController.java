@@ -17,50 +17,39 @@ public class LoginController extends HttpServlet {
 
         String email = request.getParameter("email");
         String password = request.getParameter("password");
-        String loginType = request.getParameter("loginType"); // staff / others
-
-        if (loginType == null || loginType.trim().isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/pages/login/preLogin.jsp");
-            return;
-        }
+        email = (email != null) ? email.trim().toLowerCase() : null;
 
         UserDAO dao = new UserDAO();
         User user = dao.login(email, password);
 
         if (user == null) {
             response.sendRedirect(request.getContextPath()
-                    + "/pages/login/login.jsp?loginType=" + loginType + "&error=invalid");
+                    + "/pages/login/login.jsp?error=invalid");
             return;
         }
 
-        int roleId = user.getRoleId();
+        String role = user.getRole();
+        role = (role != null) ? role.trim().toUpperCase() : null;
 
-        // STAFF/ADMIN login page only allows admin role
-        if ("staff".equals(loginType) && (roleId != 3 && roleId != 1)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/pages/login/login.jsp?loginType=staff&error=invalidrole");
-            return;
+        HttpSession oldSession = request.getSession(false);
+        if (oldSession != null) {
+            oldSession.invalidate();
         }
-
-        // OTHERS login page only allows student/lecturer
-        if ("others".equals(loginType) && (roleId == 3 && roleId == 1)) {
-            response.sendRedirect(request.getContextPath()
-                    + "/pages/login/login.jsp?loginType=others&error=invalidrole");
-            return;
-        }
-
-        HttpSession session = request.getSession();
+        HttpSession session = request.getSession(true);
 
         session.setAttribute("user", user);
         session.setAttribute("userId", user.getUserId());
         session.setAttribute("userName", user.getName());
         session.setAttribute("email", user.getEmail());
-        session.setAttribute("roleId", roleId);
+        session.setAttribute("role", role);
 
-        if (roleId == 3 || roleId == 1) {
+        if ("ADMIN".equals(role)) {
             response.sendRedirect(request.getContextPath() + "/pages/admin/adminDashboard.jsp");
+        } else if ("STAFF".equals(role)) {
+            response.sendRedirect(request.getContextPath() + "/VehicleController?action=list");
         } else {
             response.sendRedirect(request.getContextPath() + "/pages/user/userDashboard.jsp");
         }
     }
 }
+
