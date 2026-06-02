@@ -20,7 +20,7 @@ public class LogoutController extends HttpServlet {
         }
 
         // Redirect to login page
-        response.sendRedirect(request.getContextPath() + "/pages/login/preLogin.jsp");
+        response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp");
     }
 
     @Override

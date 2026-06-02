@@ -7,10 +7,10 @@ import java.sql.SQLException;
 public class DBConnection {
 
     private static final String URL
-            = "jdbc:mysql://localhost:3777/campus_vehicle_booking?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC";
+            = "jdbc:mysql://localhost:3306/campus_vehicle_booking?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC";
 
     private static final String USER = "root";
-    private static final String PASSWORD = "wp"; // change to "toor" only if your MySQL password is toor
+    private static final String PASSWORD = "admin123"; 
 
     public static Connection getConnection() throws SQLException {
         try {

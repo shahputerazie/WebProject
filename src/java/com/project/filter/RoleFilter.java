@@ -5,7 +5,7 @@ import javax.servlet.*;
 import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.*;
 
-@WebFilter("/pages/admin/*")
+@WebFilter(urlPatterns = {"/pages/admin/*", "/pages/user/*", "/pages/staff/*", "/BookingController", "/VehicleController"})
 public class RoleFilter implements Filter {
 
     @Override
@@ -16,11 +16,27 @@ public class RoleFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) res;
 
         HttpSession session = request.getSession(false);
-        Object roleObj = (session != null) ? session.getAttribute("roleId") : null;
-        
-        Integer roleId = (roleObj instanceof Integer) ? (Integer) roleObj : null;
+        String role = (session != null && session.getAttribute("role") instanceof String)
+                ? ((String) session.getAttribute("role")).trim().toUpperCase()
+                : null;
 
-        if (roleId == null || (roleId != 1 && roleId != 3)) {
+        String path = request.getServletPath();
+        boolean allowed = false;
+
+        if (path.startsWith("/pages/admin/")) {
+            // Allow staff to access the approval dashboard page only.
+            if (path.endsWith("/adminDashboard.jsp")) {
+                allowed = "ADMIN".equals(role) || "STAFF".equals(role);
+            } else {
+                allowed = "ADMIN".equals(role);
+            }
+        } else if (path.startsWith("/pages/staff/") || "/VehicleController".equals(path)) {
+            allowed = "ADMIN".equals(role) || "STAFF".equals(role);
+        } else if (path.startsWith("/pages/user/") || "/BookingController".equals(path)) {
+            allowed = "STUDENT".equals(role) || "LECTURER".equals(role);
+        }
+
+        if (!allowed) {
             response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
             return;
         }

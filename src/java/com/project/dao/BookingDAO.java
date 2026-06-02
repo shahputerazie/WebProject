@@ -16,19 +16,20 @@ public class BookingDAO {
             return false;
         }
 
-        String query = "INSERT INTO bookings (user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String query = "INSERT INTO bookings (request_code, user_id, trip_date, return_date, destination, passenger_count, vehicle_type, purpose, status) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-            pstmt.setLong(1, booking.getUserId());
-            pstmt.setDate(2, java.sql.Date.valueOf(booking.getTripDate()));
-            pstmt.setDate(3, java.sql.Date.valueOf(booking.getReturnDate()));
-            pstmt.setString(4, booking.getDestination());
-            pstmt.setInt(5, booking.getPassengerCount());
-            pstmt.setString(6, booking.getVehicleType().name());
-            pstmt.setString(7, booking.getPurpose());
-            pstmt.setString(8, booking.getStatus().name());
+            pstmt.setString(1, booking.getRequestCode());
+            pstmt.setLong(2, booking.getUserId());
+            pstmt.setDate(3, java.sql.Date.valueOf(booking.getTripDate()));
+            pstmt.setDate(4, java.sql.Date.valueOf(booking.getReturnDate()));
+            pstmt.setString(5, booking.getDestination());
+            pstmt.setInt(6, booking.getPassengerCount());
+            pstmt.setString(7, booking.getVehicleType().name());
+            pstmt.setString(8, booking.getPurpose());
+            pstmt.setString(9, booking.getStatus().name());
 
             isSuccess = pstmt.executeUpdate() > 0;
         } catch (Exception e) {

@@ -12,10 +12,10 @@
 
 <%
     // 1. SECURITY CHECK: Safe retrieval of attributes
-    Object rawRoleId = session.getAttribute("roleId");
+    Object rawRole = session.getAttribute("role");
     Object rawUserId = session.getAttribute("userId");
 
-    Integer roleId = (rawRoleId instanceof Integer) ? (Integer) rawRoleId : null;
+    String role = (rawRole instanceof String) ? (String) rawRole : null;
     Long adminId = null;
 
     // Robust parsing for userId (handles both String and Long types in session)
@@ -29,8 +29,11 @@
         }
     }
     
-    // Check if authorized (Admin=1, Staff=3)
-    if (roleId == null || adminId == null || (roleId != 1 && roleId != 3)) {
+    boolean isAdmin = "ADMIN".equals(role);
+    boolean isStaff = "STAFF".equals(role);
+
+    // Check if authorized (Admin or Staff)
+    if ((!isAdmin && !isStaff) || adminId == null) {
         response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
         return;
     }
@@ -52,13 +55,18 @@
             } else if ("REJECT".equals(action)) {
                 success = adminDAO.updateBookingStatus(bookingId, BookingRequest.Status.REJECTED);
                 msg = success ? "Booking Rejected." : "Error rejecting booking.";
-            } else if ("REVOKE".equals(action)) {
+            } else if ("COMPLETE".equals(action) && isAdmin) {
+                success = adminDAO.updateBookingStatus(bookingId, BookingRequest.Status.COMPLETED);
+                msg = success ? "Booking Completed." : "Error completing booking.";
+            } else if ("REVOKE".equals(action) && isAdmin) {
                 success = adminDAO.revokeApproval(bookingId);
                 msg = success ? "Approval Revoked." : "Error revoking approval.";
-            } else if ("GENERATE_HANDOVER".equals(action)) {
+            } else if ("GENERATE_HANDOVER".equals(action) && isAdmin) {
                 HandoverRecord record = adminDAO.generateHandoverPass(bookingId, String.valueOf(adminId));
                 success = (record != null);
                 msg = success ? "Pass Generated: " + record.getPassCode() : "Error generating pass.";
+            } else {
+                msg = "You are not authorized for this action.";
             }
 
             session.setAttribute(success ? "successMsg" : "errorMsg", msg);
@@ -72,11 +80,12 @@
 
     // 3. DATA FETCHING: Load bookings for display
     List<BookingRequest> bookings = bookingDAO.getAllBookings();
-    int pending = 0, approved = 0, cancelled = 0;
+    int pending = 0, approved = 0, completed = 0, cancelled = 0;
     if (bookings != null) {
         for (BookingRequest b : bookings) {
             if (b.getStatus() == BookingRequest.Status.PENDING) pending++;
             else if (b.getStatus() == BookingRequest.Status.APPROVED) approved++;
+            else if (b.getStatus() == BookingRequest.Status.COMPLETED) completed++;
             else if (b.getStatus() == BookingRequest.Status.CANCELLED) cancelled++;
         }
     }
@@ -115,7 +124,7 @@
             </header>
 
             <!-- Stats Grid -->
-            <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <section class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p class="text-xs font-bold uppercase text-slate-400">Pending</p>
                     <p class="text-3xl font-bold text-amber-600"><%= pending %></p>
@@ -123,6 +132,10 @@
                 <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p class="text-xs font-bold uppercase text-slate-400">Approved</p>
                     <p class="text-3xl font-bold text-blue-600"><%= approved %></p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-xs font-bold uppercase text-slate-400">Completed</p>
+                    <p class="text-3xl font-bold text-emerald-600"><%= completed %></p>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p class="text-xs font-bold uppercase text-slate-400">Revoked/Cancelled</p>
@@ -155,7 +168,10 @@
                                     <td class="px-6 py-4">
                                         <span class="px-2.5 py-1 rounded-full text-xs font-bold 
                                             <%= "PENDING".equals(status) ? "bg-amber-100 text-amber-700" : 
-                                                "APPROVED".equals(status) ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-700" %>">
+                                                "APPROVED".equals(status) ? "bg-blue-100 text-blue-700" :
+                                                "COMPLETED".equals(status) ? "bg-emerald-100 text-emerald-700" :
+                                                "REJECTED".equals(status) ? "bg-red-100 text-red-700" :
+                                                "bg-slate-100 text-slate-700" %>">
                                             <%= status %>
                                         </span>
                                         <% if ("APPROVED".equals(status)) {
@@ -169,8 +185,9 @@
                                             <% if ("PENDING".equals(status)) { %>
                                                 <button name="action" value="APPROVE" class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold">Approve</button>
                                                 <button name="action" value="REJECT" class="bg-slate-200 text-slate-700 px-3 py-1 rounded text-xs font-bold">Reject</button>
-                                            <% } else if ("APPROVED".equals(status)) { %>
+                                            <% } else if ("APPROVED".equals(status) && isAdmin) { %>
                                                 <button name="action" value="GENERATE_HANDOVER" class="border border-blue-600 text-blue-600 px-3 py-1 rounded text-xs font-bold">Issue Key</button>
+                                                <button name="action" value="COMPLETE" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold">Complete</button>
                                                 <button name="action" value="REVOKE" class="bg-red-50 text-red-600 px-3 py-1 rounded text-xs font-bold" onclick="return confirm('Revoke this?')">Revoke</button>
                                             <% } %>
                                         </form>

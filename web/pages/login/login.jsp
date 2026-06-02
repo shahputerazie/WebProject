@@ -7,99 +7,78 @@
     <meta charset="UTF-8">
     <title>Login | University Vehicle Booking</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --umt-navy: #042b61;
+            --umt-blue: #1363c6;
+            --umt-gold: #f7b718;
+            --mist: #f4f7fc;
+        }
+        body {
+            font-family: "Plus Jakarta Sans", sans-serif;
+            background:
+                radial-gradient(circle at 8% 12%, rgba(19, 99, 198, 0.15), transparent 35%),
+                radial-gradient(circle at 92% 85%, rgba(247, 183, 24, 0.20), transparent 30%),
+                linear-gradient(135deg, #eef4ff 0%, var(--mist) 45%, #ffffff 100%);
+        }
+        .headline {
+            font-family: "Manrope", sans-serif;
+        }
+        .panel {
+            animation: enterUp .45s ease-out both;
+        }
+        @keyframes enterUp {
+            from { opacity: 0; transform: translateY(14px) scale(0.99); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
 </head>
+<body class="min-h-screen flex items-center justify-center px-4 py-10">
 
-<body class="${param.loginType == 'staff' 
-              ? 'bg-slate-100 font-sans flex items-center justify-center min-h-screen' 
-              : 'bg-gray-50 font-sans flex items-center justify-center min-h-screen'}">
+<div class="panel w-full max-w-md">
+    <div class="bg-white/90 backdrop-blur rounded-3xl border border-slate-200 shadow-xl shadow-blue-900/10 p-8 sm:p-9">
+        <div class="text-center mb-8">
+            <img src="${pageContext.request.contextPath}/assets/images/Logo_Rasmi_UMT.png"
+                 alt="Universiti Malaysia Terengganu logo"
+                 class="mx-auto w-24 h-auto mb-4">
+            <p class="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">Universiti Malaysia Terengganu</p>
+            <h1 class="headline text-3xl font-extrabold text-slate-900 mt-2">Campus Vehicle Booking</h1>
+            <p class="text-slate-500 mt-2 text-sm">Sign in with your registered account</p>
+        </div>
 
-<div class="max-w-md w-full p-8">
+        <c:if test="${param.error != null}">
+            <div class="bg-rose-50 text-rose-700 p-3 rounded-xl mb-5 text-sm border border-rose-200">
+                Invalid email or password. Please try again.
+            </div>
+        </c:if>
 
-    <div class="mb-6">
-        <a href="${pageContext.request.contextPath}/pages/login/preLogin.jsp"
-           class="${param.loginType == 'staff' 
-                    ? 'inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition' 
-                    : 'inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 transition'}">
-            <span class="text-lg">←</span>
-            <span>Back</span>
-        </a>
+        <form action="${pageContext.request.contextPath}/LoginController" method="POST" class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold mb-2 text-slate-800">University Email</label>
+                <input type="email" name="email"
+                       class="w-full rounded-xl border-slate-300 focus:border-[var(--umt-blue)] focus:ring-[var(--umt-blue)]"
+                       placeholder="name@umt.edu.my" required>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2 text-slate-800">Password</label>
+                <input type="password" name="password"
+                       class="w-full rounded-xl border-slate-300 focus:border-[var(--umt-blue)] focus:ring-[var(--umt-blue)]"
+                       placeholder="Enter your password" required>
+            </div>
+
+            <button type="submit"
+                    class="w-full text-white py-3 rounded-xl font-bold transition-all duration-200 hover:-translate-y-0.5"
+                    style="background: linear-gradient(120deg, var(--umt-navy), var(--umt-blue)); box-shadow: 0 10px 20px rgba(4, 43, 97, 0.18);">
+                Sign In
+            </button>
+        </form>
+
+        <p class="text-[11px] text-center text-slate-400 mt-6">
+            © 2026 Universiti Malaysia Terengganu
+        </p>
     </div>
-
-    <c:choose>
-        <c:when test="${param.loginType == 'staff'}">
-            <div class="text-center mb-10">
-                <div class="mx-auto w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center mb-5 shadow-md">
-                    <span class="material-symbols-outlined text-white text-4xl">admin_panel_settings</span>
-                </div>
-                <h1 class="text-3xl font-extrabold text-slate-900">Staff / Admin Login</h1>
-                <p class="text-slate-500 mt-2">Authorized access for system management</p>
-            </div>
-        </c:when>
-
-        <c:otherwise>
-            <div class="text-center mb-10">
-                <h1 class="text-3xl font-extrabold text-gray-900">Welcome Back</h1>
-                <p class="text-gray-500 mt-2">Sign in to manage your bookings</p>
-            </div>
-        </c:otherwise>
-    </c:choose>
-
-    <c:if test="${param.error != null}">
-        <div class="bg-red-100 text-red-700 p-4 rounded-xl mb-6 text-sm border border-red-200">
-            Invalid email, password, or login type. Please try again.
-        </div>
-    </c:if>
-
-    <form action="${pageContext.request.contextPath}/LoginController" method="POST"
-          class="${param.loginType == 'staff' 
-                   ? 'bg-white p-8 rounded-2xl shadow-lg border border-slate-200 space-y-5' 
-                   : 'bg-white p-8 rounded-2xl shadow-sm border space-y-5'}">
-
-        <input type="hidden" name="loginType" value="${param.loginType}">
-
-        <div>
-            <label class="block text-sm font-semibold mb-2 ${param.loginType == 'staff' ? 'text-slate-800' : 'text-gray-800'}">
-                University Email
-            </label>
-            <input type="email" name="email"
-                   class="w-full rounded-xl border-gray-300 ${param.loginType == 'staff' ? 'focus:ring-2 focus:ring-slate-700' : 'focus:ring-2 focus:ring-blue-500'}"
-                   placeholder="name@umt.edu.my" required>
-        </div>
-
-        <div>
-            <label class="block text-sm font-semibold mb-2 ${param.loginType == 'staff' ? 'text-slate-800' : 'text-gray-800'}">
-                Password
-            </label>
-            <input type="password" name="password"
-                   class="w-full rounded-xl border-gray-300 ${param.loginType == 'staff' ? 'focus:ring-2 focus:ring-slate-700' : 'focus:ring-2 focus:ring-blue-500'}"
-                   placeholder="••••••••" required>
-        </div>
-
-        <button type="submit"
-                class="${param.loginType == 'staff' 
-                         ? 'w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors' 
-                         : 'w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors'}">
-            Sign In
-        </button>
-
-        <c:if test="${param.loginType != 'staff'}">
-            <p class="mt-6 text-sm text-gray-500 text-center">
-                Don't have an account?
-                <a href="${pageContext.request.contextPath}/pages/login/register.jsp"
-                   class="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition">
-                    Register here
-                </a>
-            </p>
-        </c:if>
-
-        <c:if test="${param.loginType == 'staff'}">
-            <p class="mt-6 text-xs text-slate-400 text-center">
-                Staff/Admin accounts are managed by the administrator.
-            </p>
-        </c:if>
-    </form>
 </div>
 
 </body>

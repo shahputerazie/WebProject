@@ -42,7 +42,7 @@
 
                     <div>
                         <h2 class="text-xl font-bold">${user.name}</h2>
-                        <p class="opacity-80 text-sm">Role ID: ${user.roleId}</p>
+                        <p class="opacity-80 text-sm">Role: ${user.role}</p>
                     </div>
                 </div>
 

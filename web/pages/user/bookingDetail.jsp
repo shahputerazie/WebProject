@@ -82,7 +82,7 @@
                 <% } %>
 
                 <section class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/10">
-                    <form action="${pageContext.request.contextPath}/SubmitBooking" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <form action="${pageContext.request.contextPath}/BookingController" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input type="hidden" name="action" value="update"/>
                         <input type="hidden" name="id" value="<%= booking.getId() %>"/>
 
@@ -119,11 +119,11 @@
                         <div class="md:col-span-2 flex justify-end gap-3 pt-1">
                             <a href="${pageContext.request.contextPath}/pages/user/bookingRequest.jsp" class="px-5 py-2.5 rounded-md border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors">Back to List</a>
                             <% if (canModify) { %>
-                            <form action="${pageContext.request.contextPath}/SubmitBooking" method="POST" class="inline-block" onsubmit="return confirm('Cancel this booking request?');">
-                                <input type="hidden" name="action" value="cancel"/>
-                                <input type="hidden" name="id" value="<%= booking.getId() %>"/>
-                                <button type="submit" class="px-5 py-2.5 rounded-md bg-error text-white font-semibold hover:opacity-90">Cancel Request</button>
-                            </form>
+                            <button type="submit" name="action" value="cancel" formnovalidate
+                                    onclick="return confirm('Cancel this booking request?');"
+                                    class="px-5 py-2.5 rounded-md bg-error text-white font-semibold hover:opacity-90">
+                                Cancel Request
+                            </button>
                             <button type="submit" class="px-5 py-2.5 rounded-md bg-gradient-to-r from-primary to-surface-tint text-white font-semibold">Save Changes</button>
                             <% } %>
                         </div>

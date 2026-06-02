@@ -20,9 +20,13 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        if (!isStudentOrLecturer(request)) {
+            response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
+            return;
+        }
         Long userId = getCurrentUserId(request);
         if (userId == null) {
-            response.sendRedirect(request.getContextPath() + "/login.jsp");
+            response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp");
             return;
         }
 
@@ -40,11 +44,17 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        if (!isStudentOrLecturer(request)) {
+            response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
+            return;
+        }
         request.setCharacterEncoding("UTF-8");
         String action = request.getParameter("action");
 
         if ("update".equalsIgnoreCase(action)) {
             updateBooking(request, response, getCurrentUserId(request));
+        } else if ("cancel".equalsIgnoreCase(action)) {
+            cancelBooking(request, response, getCurrentUserId(request));
         } else {
             submitBooking(request, response);
         }
@@ -86,20 +96,57 @@ public class BookingController extends HttpServlet {
     private void showBookingDetail(HttpServletRequest request, HttpServletResponse response, Long userId)
             throws ServletException, IOException {
         String idParam = request.getParameter("id");
-        if (idParam != null) {
-            BookingRequest booking = dao.getBookingByIdAndUserId(Long.parseLong(idParam), userId);
-            if (booking != null) {
-                request.setAttribute("booking", booking);
-                request.getRequestDispatcher("/pages/user/bookingDetail.jsp").forward(request, response);
-                return;
-            }
+        if (idParam == null || idParam.trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() + "/BookingController");
+            return;
+        }
+
+        long bookingId;
+        try {
+            bookingId = Long.parseLong(idParam);
+        } catch (NumberFormatException ex) {
+            response.sendRedirect(request.getContextPath() + "/BookingController");
+            return;
+        }
+
+        BookingRequest booking = dao.getBookingByIdAndUserId(bookingId, userId);
+        if (booking != null) {
+            request.setAttribute("booking", booking);
+            request.setAttribute("canModify", booking.getStatus() == BookingRequest.Status.PENDING);
+            request.getRequestDispatcher("/pages/user/bookingDetail.jsp").forward(request, response);
+            return;
         }
         response.sendRedirect(request.getContextPath() + "/BookingController");
     }
 
     private void updateBooking(HttpServletRequest request, HttpServletResponse response, Long userId) throws IOException {
-        // Implementation for updating existing record
-        setSessionMessage(request, "Update feature integrated.", "success");
+        try {
+            long bookingId = Long.parseLong(request.getParameter("id"));
+            BookingRequest b = new BookingRequest();
+            b.setId(bookingId);
+            b.setTripDate(LocalDate.parse(request.getParameter("tripDate")));
+            b.setReturnDate(LocalDate.parse(request.getParameter("returnDate")));
+            b.setDestination(request.getParameter("destination").trim());
+            b.setPassengerCount(Integer.parseInt(request.getParameter("passengerCount")));
+            b.setVehicleType(BookingRequest.VehicleType.valueOf(request.getParameter("vehicleType")));
+            b.setPurpose(request.getParameter("purpose").trim());
+
+            boolean ok = dao.updatePendingBookingForUser(b, userId);
+            setSessionMessage(request, ok ? "Booking updated successfully." : "Only pending bookings can be updated.", ok ? "success" : "error");
+        } catch (Exception e) {
+            setSessionMessage(request, "Invalid booking update request.", "error");
+        }
+        response.sendRedirect(request.getContextPath() + "/BookingController");
+    }
+
+    private void cancelBooking(HttpServletRequest request, HttpServletResponse response, Long userId) throws IOException {
+        try {
+            long bookingId = Long.parseLong(request.getParameter("id"));
+            boolean ok = dao.cancelPendingBookingForUser(bookingId, userId);
+            setSessionMessage(request, ok ? "Booking cancelled successfully." : "Only pending bookings can be cancelled.", ok ? "success" : "error");
+        } catch (Exception e) {
+            setSessionMessage(request, "Invalid cancel request.", "error");
+        }
         response.sendRedirect(request.getContextPath() + "/BookingController");
     }
 
@@ -122,5 +169,13 @@ public class BookingController extends HttpServlet {
         HttpSession session = request.getSession(false);
         Object uid = (session != null) ? session.getAttribute("userId") : null;
         return (uid != null) ? Long.valueOf(uid.toString()) : null;
+    }
+
+    private boolean isStudentOrLecturer(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        String role = (session != null && session.getAttribute("role") instanceof String)
+                ? ((String) session.getAttribute("role")).trim().toUpperCase()
+                : null;
+        return "STUDENT".equals(role) || "LECTURER".equals(role);
     }
 }

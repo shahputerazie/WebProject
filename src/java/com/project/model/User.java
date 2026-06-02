@@ -1,6 +1,7 @@
 package com.project.model;
 
 import java.io.Serializable;
+import com.project.util.PasswordUtil;
 
 public class User implements Serializable {
 
@@ -9,7 +10,7 @@ public class User implements Serializable {
     private String name;
     private String email;
     private String passwordHash;
-    private int roleId;         // FK to Role
+    private String role;
     private String phone;
     private boolean isActive;
 
@@ -18,12 +19,12 @@ public class User implements Serializable {
     }
 
     // Fixed Parameterized Constructor: userId changed from int to String
-    public User(String userId, String name, String email, String passwordHash, int roleId, String phone, boolean isActive) {
+    public User(String userId, String name, String email, String passwordHash, String role, String phone, boolean isActive) {
         this.userId = userId;
         this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
-        this.roleId = roleId;
+        this.role = role;
         this.phone = phone;
         this.isActive = isActive;
     }
@@ -72,12 +73,12 @@ public class User implements Serializable {
         this.passwordHash = password;
     }
 
-    public int getRoleId() {
-        return roleId;
+    public String getRole() {
+        return role;
     }
 
-    public void setRoleId(int roleId) {
-        this.roleId = roleId;
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getPhone() {
@@ -98,7 +99,7 @@ public class User implements Serializable {
 
     // Custom logic methods
     public boolean validatePassword(String password) {
-        return this.passwordHash != null && this.passwordHash.equals(password);
+        return PasswordUtil.matches(password, this.passwordHash);
     }
 
     public void updateProfile() {

@@ -12,6 +12,13 @@ public class VehicleController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        HttpSession session = request.getSession(false);
+        String role = (session != null && session.getAttribute("role") instanceof String)
+                ? ((String) session.getAttribute("role")).trim().toUpperCase() : null;
+        if (!("ADMIN".equals(role) || "STAFF".equals(role))) {
+            response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
+            return;
+        }
 
         String action = request.getParameter("action");
         VehicleDAO dao = new VehicleDAO();
@@ -57,6 +64,13 @@ public class VehicleController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        HttpSession session = request.getSession(false);
+        String role = (session != null && session.getAttribute("role") instanceof String)
+                ? ((String) session.getAttribute("role")).trim().toUpperCase() : null;
+        if (!("ADMIN".equals(role) || "STAFF".equals(role))) {
+            response.sendRedirect(request.getContextPath() + "/pages/login/login.jsp?error=unauthorized");
+            return;
+        }
 
         System.out.println("=== VEHICLE CONTROLLER DO POST CALLED ===");
         System.out.println("ACTION = " + request.getParameter("action"));
