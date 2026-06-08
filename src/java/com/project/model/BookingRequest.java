@@ -2,11 +2,13 @@ package com.project.model;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.math.BigDecimal;
 
 public class BookingRequest {
 
     public enum VehicleType {
-        VAN, MPV, BUS, FOUR_BY_FOUR
+        SEDAN, SUV
     }
 
     public enum Status {
@@ -18,11 +20,18 @@ public class BookingRequest {
     private Long userId;
     private LocalDate tripDate;
     private LocalDate returnDate;
+    private LocalTime returnTime;
     private String destination;
     private int passengerCount;
     private VehicleType vehicleType;
     private String purpose;
+    private String licenseImagePath;
+    private BigDecimal dailyRentalFee;
+    private BigDecimal lateFeePerHour;
+    private BigDecimal estimatedRentalFee;
+    private Long assignedVehicleId;
     private Status status;
+    private String rejectionReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -97,6 +106,14 @@ public class BookingRequest {
         this.returnDate = returnDate;
     }
 
+    public LocalTime getReturnTime() {
+        return returnTime;
+    }
+
+    public void setReturnTime(LocalTime returnTime) {
+        this.returnTime = returnTime;
+    }
+
     public String getDestination() {
         return destination;
     }
@@ -129,12 +146,60 @@ public class BookingRequest {
         this.purpose = purpose;
     }
 
+    public String getLicenseImagePath() {
+        return licenseImagePath;
+    }
+
+    public void setLicenseImagePath(String licenseImagePath) {
+        this.licenseImagePath = licenseImagePath;
+    }
+
+    public BigDecimal getDailyRentalFee() {
+        return dailyRentalFee;
+    }
+
+    public void setDailyRentalFee(BigDecimal dailyRentalFee) {
+        this.dailyRentalFee = dailyRentalFee;
+    }
+
+    public BigDecimal getLateFeePerHour() {
+        return lateFeePerHour;
+    }
+
+    public void setLateFeePerHour(BigDecimal lateFeePerHour) {
+        this.lateFeePerHour = lateFeePerHour;
+    }
+
+    public BigDecimal getEstimatedRentalFee() {
+        return estimatedRentalFee;
+    }
+
+    public void setEstimatedRentalFee(BigDecimal estimatedRentalFee) {
+        this.estimatedRentalFee = estimatedRentalFee;
+    }
+
+    public Long getAssignedVehicleId() {
+        return assignedVehicleId;
+    }
+
+    public void setAssignedVehicleId(Long assignedVehicleId) {
+        this.assignedVehicleId = assignedVehicleId;
+    }
+
     public Status getStatus() {
         return status;
     }
 
     public void setStatus(Status status) {
         this.status = status;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public LocalDateTime getCreatedAt() {

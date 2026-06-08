@@ -2,6 +2,7 @@ package com.project.controller;
 
 import com.project.dao.AdminDecisionDAO;
 import com.project.dao.BookingDAO;
+import com.project.dao.VehicleDAO;
 import com.project.model.BookingRequest;
 import com.project.model.HandoverRecord;
 
@@ -23,28 +24,49 @@ public class AdminDecisionController extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         // Fetch all bookings for the admin dashboard
         request.setAttribute("bookings", bookingDAO.getAllBookings());
-        request.getRequestDispatcher("/WEB-INF/views/admin-dashboard.jsp").forward(request, response);
+        request.setAttribute("availableVehicles", new VehicleDAO().getVehiclesByStatus("AVAILABLE"));
+        request.setAttribute("sidebarActive", "admin");
+        request.getRequestDispatcher("/pages/admin/adminDashboard.jsp").forward(request, response);
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         HttpSession session = request.getSession();
-        String adminId = (String) session.getAttribute("userId"); // Assuming admin is logged in
+        Object rawAdminId = session.getAttribute("userId");
+        String adminId = (rawAdminId == null) ? null : String.valueOf(rawAdminId);
         
         String action = request.getParameter("action");
         Long bookingId = Long.parseLong(request.getParameter("bookingId"));
+        Long vehicleId = null;
+        String vehicleIdParam = request.getParameter("vehicleId");
+        if (vehicleIdParam != null && !vehicleIdParam.trim().isEmpty()) {
+            try {
+                vehicleId = Long.valueOf(vehicleIdParam.trim());
+            } catch (NumberFormatException ignored) {
+                vehicleId = null;
+            }
+        }
         
         boolean success = false;
         String message = "";
 
         switch (action) {
             case "APPROVE":
-                success = adminDAO.updateBookingStatus(bookingId, BookingRequest.Status.APPROVED);
-                message = success ? "Booking approved successfully." : "Failed to approve booking.";
+                if (vehicleId == null) {
+                    message = "Please select an available vehicle before approving.";
+                    break;
+                }
+                success = adminDAO.approveBookingWithVehicle(bookingId, vehicleId);
+                message = success ? "Booking approved and vehicle assigned." : "Failed to approve booking. Check vehicle availability and type.";
                 break;
             case "REJECT":
-                success = adminDAO.updateBookingStatus(bookingId, BookingRequest.Status.REJECTED);
-                message = success ? "Booking rejected." : "Failed to reject booking.";
+                String rejectionReason = request.getParameter("rejectionReason");
+                if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
+                    message = "Please provide a rejection reason.";
+                    break;
+                }
+                success = adminDAO.updateBookingStatus(bookingId, BookingRequest.Status.REJECTED, rejectionReason);
+                message = success ? "Booking rejected with reason saved." : "Failed to reject booking.";
                 break;
             case "COMPLETE":
                 // Assuming you add COMPLETED to your Status enum
@@ -56,6 +78,10 @@ public class AdminDecisionController extends HttpServlet {
                 message = success ? "Approval revoked and cancelled." : "Failed to revoke approval.";
                 break;
             case "GENERATE_HANDOVER":
+                if (adminId == null) {
+                    message = "Unable to identify the admin account.";
+                    break;
+                }
                 HandoverRecord record = adminDAO.generateHandoverPass(bookingId, adminId);
                 success = (record != null);
                 message = success ? "Handover Pass Generated: " + record.getPassCode() : "Failed to generate pass.";

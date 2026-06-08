@@ -30,6 +30,8 @@ public class RoleFilter implements Filter {
             } else {
                 allowed = "ADMIN".equals(role);
             }
+        } else if ("/admin/decisions".equals(path)) {
+            allowed = "ADMIN".equals(role) || "STAFF".equals(role);
         } else if (path.startsWith("/pages/staff/") || "/VehicleController".equals(path)) {
             allowed = "ADMIN".equals(role) || "STAFF".equals(role);
         } else if (path.startsWith("/pages/user/") || "/BookingController".equals(path)) {

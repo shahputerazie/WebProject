@@ -92,15 +92,24 @@ public class VehicleController extends HttpServlet {
 
         String plate = request.getParameter("licensePlate");
         String type = request.getParameter("type");
-        int cap = Integer.parseInt(request.getParameter("capacity"));
         String status = request.getParameter("status");
 
         boolean success;
 
         if ("update".equals(action)) {
             int id = Integer.parseInt(request.getParameter("id"));
+            int cap = getDefaultCapacity(type);
+            if (cap <= 0) {
+                response.sendRedirect("VehicleController?action=list&error=true");
+                return;
+            }
             success = dao.updateVehicle(new Vehicle(id, plate, type, cap, status));
         } else {
+            int cap = getDefaultCapacity(type);
+            if (cap <= 0) {
+                response.sendRedirect("pages/staff/addVehicle.jsp?error=true");
+                return;
+            }
             success = dao.addVehicle(new Vehicle(plate, type, cap, status));
         }
 
@@ -108,6 +117,23 @@ public class VehicleController extends HttpServlet {
             response.sendRedirect("VehicleController?action=list&success=true");
         } else {
             response.sendRedirect("pages/staff/addVehicle.jsp?error=true");
+        }
+    }
+
+    private int getDefaultCapacity(String type) {
+        if (type == null) {
+            return 0;
+        }
+
+        switch (type.trim().toUpperCase()) {
+            case "SEDAN":
+            case "NORMAL_CAR":
+                return 4;
+            case "SUV":
+            case "LARGE_CAR":
+                return 7;
+            default:
+                return 0;
         }
     }
 }

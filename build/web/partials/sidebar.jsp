@@ -13,9 +13,9 @@
 
     String dashboardUrl = "/pages/user/userDashboard.jsp";
     if ("ADMIN".equals(role)) {
-        dashboardUrl = "/pages/admin/adminDashboard.jsp";
+        dashboardUrl = "/pages/admin/dashboard.jsp";
     } else if ("STAFF".equals(role)) {
-        dashboardUrl = "/VehicleController?action=list";
+        dashboardUrl = "/pages/staff/dashboard.jsp";
     }
 %>
 
@@ -72,7 +72,7 @@
             <span class="material-symbols-outlined">directions_car</span>
             <span class="font-medium">Fleet Management</span>
         </a>
-        <a class="<%= "dashboard".equals(active) ? activeClass : inactiveClass%>"
+        <a class="<%= "approvals".equals(active) ? activeClass : inactiveClass%>"
            href="${pageContext.request.contextPath}/pages/admin/adminDashboard.jsp">
             <span class="material-symbols-outlined">fact_check</span>
             <span class="font-medium">Booking Approvals</span>
@@ -81,11 +81,6 @@
 
         <% if ("ADMIN".equals(role)) { %>
         <p class="px-4 pt-4 pb-1 text-[10px] uppercase tracking-[0.18em] text-blue-200/50 font-bold">Administration</p>
-        <a class="<%= "dashboard".equals(active) ? activeClass : inactiveClass%>"
-           href="${pageContext.request.contextPath}/pages/admin/adminDashboard.jsp">
-            <span class="material-symbols-outlined">admin_panel_settings</span>
-            <span class="font-medium">Admin Dashboard</span>
-        </a>
         <a class="<%= "users".equals(active) ? activeClass : inactiveClass%>"
            href="${pageContext.request.contextPath}/AdminUserController">
             <span class="material-symbols-outlined">manage_accounts</span>
@@ -104,60 +99,6 @@
         </a>
         <% } %>
 
-        <button type="button"
-                onclick="openLogoutModal()"
-                class="block text-center w-full bg-red-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-red-600 transition shadow-md">
-            Logout
-        </button>
-
     </div>
-
-    <!-- Logout Modal -->
-    <div id="logoutModal"
-         class="hidden fixed inset-0 bg-black/50 z-[999] flex items-center justify-center">
-
-        <div class="bg-white rounded-2xl shadow-xl w-80 p-6 text-center">
-
-            <div class="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                <span class="material-symbols-outlined text-red-600">logout</span>
-            </div>
-
-            <h2 class="text-lg font-bold text-gray-900 mb-2">
-                Confirm Logout
-            </h2>
-
-            <p class="text-sm text-gray-500 mb-6">
-                Are you sure you want to logout?
-            </p>
-
-            <div class="flex gap-3">
-
-                <button type="button"
-                        onclick="closeLogoutModal()"
-                        class="flex-1 py-2 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-100">
-                    Cancel
-                </button>
-
-                <a href="${pageContext.request.contextPath}/LogoutController"
-                   class="flex-1 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600">
-                    Logout
-                </a>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <script>
-        function openLogoutModal() {
-            document.getElementById("logoutModal").classList.remove("hidden");
-        }
-
-        function closeLogoutModal() {
-            document.getElementById("logoutModal").classList.add("hidden");
-        }
-    </script>
 
 </aside>
-

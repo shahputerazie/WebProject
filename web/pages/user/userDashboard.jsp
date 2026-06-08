@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.List,com.project.dao.BookingDAO,com.project.model.BookingRequest" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.List,com.project.dao.BookingDAO,com.project.dao.VehicleDAO,com.project.model.BookingRequest,com.project.model.Vehicle" %>
 <%!
     private String esc(String value) {
         if (value == null) {
@@ -27,13 +27,16 @@
     }
 
     BookingDAO bookingDAO = new BookingDAO();
+    VehicleDAO vehicleDAO = new VehicleDAO();
     List<BookingRequest> bookings = currentUserId == null
             ? bookingDAO.getAllBookings()
             : bookingDAO.getBookingsByUserId(currentUserId);
+    List<Vehicle> vehicles = vehicleDAO.getAllVehicles();
     int totalRequests = bookings.size();
     int pendingRequests = 0;
     int approvedRequests = 0;
     int cancelledRequests = 0;
+    int availableCars = 0;
 
     for (BookingRequest booking : bookings) {
         if (booking.getStatus() == null) {
@@ -45,6 +48,14 @@
             approvedRequests++;
         } else if (booking.getStatus() == BookingRequest.Status.CANCELLED) {
             cancelledRequests++;
+        }
+    }
+
+    if (vehicles != null) {
+        for (Vehicle vehicle : vehicles) {
+            if ("AVAILABLE".equalsIgnoreCase(vehicle.getStatus())) {
+                availableCars++;
+            }
         }
     }
 %>
@@ -76,7 +87,7 @@
                     </div>
                 </section>
 
-                <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                     <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
                         <p class="text-xs uppercase tracking-widest text-on-surface-variant mb-2">Total Requests</p>
                         <p class="text-3xl font-headline font-bold text-primary"><%= totalRequests %></p>
@@ -93,6 +104,10 @@
                         <p class="text-xs uppercase tracking-widest text-on-surface-variant mb-2">Cancelled Requests</p>
                         <p class="text-3xl font-headline font-bold text-error"><%= cancelledRequests %></p>
                     </div>
+                    <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/5">
+                        <p class="text-xs uppercase tracking-widest text-on-surface-variant mb-2">Available Cars</p>
+                        <p class="text-3xl font-headline font-bold text-emerald-600"><%= availableCars %></p>
+                    </div>
                 </section>
 
                 <section class="bg-surface-container-lowest rounded-2xl border border-outline-variant/10 overflow-hidden">
@@ -100,13 +115,13 @@
                         <h2 class="font-headline font-bold text-xl">Recent Booking Activity</h2>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full border-collapse">
+                        <table class="w-full border-collapse" data-sortable-table="true">
                             <thead>
                                 <tr class="bg-surface-container-high/50 text-left">
-                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Request ID</th>
-                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Requester</th>
-                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Destination</th>
-                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Status</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Request ID</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Requester</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Destination</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-surface">
@@ -149,5 +164,6 @@
                 </section>
             </div>
         </main>
+        <script src="${pageContext.request.contextPath}/assets/js/table-sort.js"></script>
     </body>
 </html>

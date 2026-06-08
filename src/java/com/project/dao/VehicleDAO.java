@@ -58,6 +58,38 @@ public class VehicleDAO {
         return list;
     }
 
+    public List<Vehicle> getAvailableVehiclesByType(String type) {
+        List<Vehicle> list = new ArrayList<>();
+        String sql = "SELECT * FROM vehicles WHERE status = 'AVAILABLE' AND type = ? ORDER BY license_plate ASC";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, type);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Vehicle(rs.getInt("id"), rs.getString("license_plate"),
+                            rs.getString("type"), rs.getInt("capacity"), rs.getString("status")));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    public int countAvailableVehiclesByType(String type) {
+        String sql = "SELECT COUNT(*) AS total FROM vehicles WHERE status = 'AVAILABLE' AND type = ?";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, type);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("total");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
     public Vehicle getVehicleById(int id) {
         String sql = "SELECT * FROM vehicles WHERE id = ?";
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
