@@ -36,12 +36,12 @@
                 </c:if>
 
                 <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                    <table class="w-full text-left">
+                    <table class="w-full text-left" data-sortable-table="true">
                         <thead class="bg-gray-50 border-b">
                             <tr>
-                                <th class="p-4 font-semibold text-sm text-gray-600">User Details</th>
-                                <th class="p-4 font-semibold text-sm text-gray-600">Role</th>
-                                <th class="p-4 font-semibold text-sm text-gray-600">Status</th>
+                                <th class="p-4 font-semibold text-sm text-gray-600" data-sortable-type="text">User Details</th>
+                                <th class="p-4 font-semibold text-sm text-gray-600" data-sortable-type="text">Role</th>
+                                <th class="p-4 font-semibold text-sm text-gray-600" data-sortable-type="text">Status</th>
                                 <th class="p-4 font-semibold text-sm text-gray-600 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -94,5 +94,6 @@
                 </div>
             </div>
         </main>
+        <script src="${pageContext.request.contextPath}/assets/js/table-sort.js"></script>
     </body>
 </html>

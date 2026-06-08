@@ -35,7 +35,13 @@ public class BookingManagementServlet extends HttpServlet {
         if ("APPROVE".equals(action)) {
             success = bookingDAO.updateBookingStatus(bookingId, "APPROVED");
         } else if ("REJECT".equals(action)) {
-            success = bookingDAO.updateBookingStatus(bookingId, "REJECTED");
+            String rejectionReason = request.getParameter("rejectionReason");
+            if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
+                request.getSession().setAttribute("error", "Rejection reason is required.");
+                response.sendRedirect(request.getContextPath() + "/staff/manage-bookings");
+                return;
+            }
+            success = bookingDAO.updateBookingStatus(bookingId, "REJECTED", rejectionReason);
         }
 
         if (success) {

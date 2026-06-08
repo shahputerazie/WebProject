@@ -5,20 +5,144 @@ import com.project.model.HandoverRecord;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Types;
 import java.util.UUID;
 
 public class AdminDecisionDAO {
 
     // UPDATE: Change booking status (Approve, Reject, Complete, Cancel)
     public boolean updateBookingStatus(Long bookingId, Status newStatus) {
-        String sql = "UPDATE bookings SET status = ?, updated_at = NOW() WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setString(1, newStatus.name());
-            ps.setLong(2, bookingId);
-            return ps.executeUpdate() > 0;
-            
+        return updateBookingStatus(bookingId, newStatus, null);
+    }
+
+    public boolean updateBookingStatus(Long bookingId, Status newStatus, String rejectionReason) {
+        String selectSql = "SELECT assigned_vehicle_id FROM bookings WHERE id = ? FOR UPDATE";
+        String updateSql = "UPDATE bookings SET status = ?, rejection_reason = ?, updated_at = NOW() WHERE id = ?";
+        String releaseSql = "UPDATE vehicles SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?";
+        String normalizedReason = (rejectionReason == null || rejectionReason.trim().isEmpty()) ? null : rejectionReason.trim();
+
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            Long assignedVehicleId = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                ps.setLong(1, bookingId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        long vehicleId = rs.getLong("assigned_vehicle_id");
+                        assignedVehicleId = rs.wasNull() ? null : vehicleId;
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                ps.setString(1, newStatus.name());
+                if (Status.REJECTED.equals(newStatus)) {
+                    ps.setString(2, normalizedReason);
+                } else {
+                    ps.setNull(2, java.sql.Types.LONGVARCHAR);
+                }
+                ps.setLong(3, bookingId);
+                if (ps.executeUpdate() <= 0) {
+                    conn.rollback();
+                    return false;
+                }
+            }
+
+            if (assignedVehicleId != null && (Status.COMPLETED.equals(newStatus)
+                    || Status.REJECTED.equals(newStatus)
+                    || Status.CANCELLED.equals(newStatus))) {
+                try (PreparedStatement ps = conn.prepareStatement(releaseSql)) {
+                    ps.setLong(1, assignedVehicleId);
+                    ps.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean approveBookingWithVehicle(Long bookingId, Long vehicleId) {
+        String bookingSql = "SELECT vehicle_type, status FROM bookings WHERE id = ? FOR UPDATE";
+        String vehicleSql = "SELECT type, status FROM vehicles WHERE id = ? FOR UPDATE";
+        String updateBookingSql = "UPDATE bookings SET status = 'APPROVED', assigned_vehicle_id = ?, rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND status = 'PENDING'";
+        String updateVehicleSql = "UPDATE vehicles SET status = 'UNAVAILABLE', updated_at = NOW() WHERE id = ?";
+
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+
+            String bookingType = null;
+            String bookingStatus = null;
+            String vehicleType = null;
+            String vehicleStatus = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(bookingSql)) {
+                ps.setLong(1, bookingId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        bookingType = rs.getString("vehicle_type");
+                        bookingStatus = rs.getString("status");
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            if (!"PENDING".equalsIgnoreCase(bookingStatus)) {
+                conn.rollback();
+                return false;
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(vehicleSql)) {
+                ps.setLong(1, vehicleId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        vehicleType = rs.getString("type");
+                        vehicleStatus = rs.getString("status");
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            String bookingCategory = normalizeVehicleCategory(bookingType);
+            String vehicleCategory = normalizeVehicleCategory(vehicleType);
+
+            if (!"AVAILABLE".equalsIgnoreCase(vehicleStatus)
+                    || bookingCategory == null
+                    || vehicleCategory == null
+                    || !vehicleCategory.equals(bookingCategory)) {
+                conn.rollback();
+                return false;
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(updateBookingSql)) {
+                ps.setLong(1, vehicleId);
+                ps.setLong(2, bookingId);
+                if (ps.executeUpdate() <= 0) {
+                    conn.rollback();
+                    return false;
+                }
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(updateVehicleSql)) {
+                ps.setLong(1, vehicleId);
+                ps.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -27,11 +151,25 @@ public class AdminDecisionDAO {
 
     // DELETE / REVERT: Revoke an approval (sets status to CANCELLED and optionally removes handover)
     public boolean revokeApproval(Long bookingId) {
-        String updateSql = "UPDATE bookings SET status = 'CANCELLED', updated_at = NOW() WHERE id = ? AND status = 'APPROVED'";
+        String selectSql = "SELECT assigned_vehicle_id FROM bookings WHERE id = ? FOR UPDATE";
+        String updateSql = "UPDATE bookings SET status = 'CANCELLED', rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND status = 'APPROVED'";
         String deleteHandoverSql = "DELETE FROM handover_records WHERE booking_id = ?";
+        String releaseSql = "UPDATE vehicles SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?";
         
         try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
+            Long assignedVehicleId = null;
+
+            try (PreparedStatement psSelect = conn.prepareStatement(selectSql)) {
+                psSelect.setLong(1, bookingId);
+                try (ResultSet rs = psSelect.executeQuery()) {
+                    if (rs.next()) {
+                        long vehicleId = rs.getLong("assigned_vehicle_id");
+                        assignedVehicleId = rs.wasNull() ? null : vehicleId;
+                    }
+                }
+            }
+
             try (PreparedStatement psUpdate = conn.prepareStatement(updateSql);
                  PreparedStatement psDelete = conn.prepareStatement(deleteHandoverSql)) {
                 
@@ -41,6 +179,12 @@ public class AdminDecisionDAO {
                 if (updated > 0) {
                     psDelete.setLong(1, bookingId);
                     psDelete.executeUpdate();
+                    if (assignedVehicleId != null) {
+                        try (PreparedStatement psRelease = conn.prepareStatement(releaseSql)) {
+                            psRelease.setLong(1, assignedVehicleId);
+                            psRelease.executeUpdate();
+                        }
+                    }
                     conn.commit();
                     return true;
                 } else {
@@ -93,6 +237,23 @@ public class AdminDecisionDAO {
             if (rs.next()) return rs.getString("pass_code");
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        return null;
+    }
+
+    private String normalizeVehicleCategory(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = value.trim().toUpperCase();
+        if ("SEDAN".equals(normalized) || "COMPACT_CAR".equals(normalized) || "NORMAL_CAR".equals(normalized)
+                || "VAN".equals(normalized)) {
+            return "SEDAN";
+        }
+        if ("SUV".equals(normalized) || "MPV".equals(normalized) || "LARGE_CAR".equals(normalized)
+                || "BUS".equals(normalized) || "FOUR_BY_FOUR".equals(normalized)) {
+            return "SUV";
         }
         return null;
     }

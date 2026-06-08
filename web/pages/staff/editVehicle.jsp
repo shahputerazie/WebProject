@@ -51,17 +51,12 @@
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Vehicle Type</label>
                             <select name="type" class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500">
-                                <option value="Bus" ${vehicle.type == 'Bus' ? 'selected' : ''}>Bus</option>
-                                <option value="Van" ${vehicle.type == 'Van' ? 'selected' : ''}>Van</option>
+                                <option value="SEDAN" ${vehicle.type == 'SEDAN' ? 'selected' : ''}>Sedan</option>
                                 <option value="SUV" ${vehicle.type == 'SUV' ? 'selected' : ''}>SUV</option>
-                                <option value="Sedan" ${vehicle.type == 'Sedan' ? 'selected' : ''}>Sedan</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Capacity</label>
-                            <input type="number" name="capacity" value="${vehicle.capacity}" 
-                                   class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500" required>
+                            <p class="mt-2 text-xs text-gray-500">
+                                Capacity is preset from the selected vehicle type and cannot be edited manually.
+                            </p>
                         </div>
 
                         <div>

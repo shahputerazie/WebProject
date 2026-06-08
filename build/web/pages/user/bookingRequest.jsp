@@ -1,410 +1,343 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
-<%@ page import="java.util.List,com.project.model.BookingRequest" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.List,com.project.model.BookingRequest" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <%
     List<BookingRequest> bookingList = (List<BookingRequest>) request.getAttribute("bookings");
-    int pendingCount = 0;
-    int approvedCount = 0;
-    int completedCount = 0;
-    int rejectedCount = 0;
-    int cancelledCount = 0;
-    if (bookingList != null) {
-        for (BookingRequest b : bookingList) {
-            if (b.getStatus() == BookingRequest.Status.PENDING) pendingCount++;
-            else if (b.getStatus() == BookingRequest.Status.APPROVED) approvedCount++;
-            else if (b.getStatus() == BookingRequest.Status.COMPLETED) completedCount++;
-            else if (b.getStatus() == BookingRequest.Status.REJECTED) rejectedCount++;
-            else if (b.getStatus() == BookingRequest.Status.CANCELLED) cancelledCount++;
+    int pendingCount = request.getAttribute("bookingPendingCount") != null ? (Integer) request.getAttribute("bookingPendingCount") : 0;
+    int approvedCount = request.getAttribute("bookingApprovedCount") != null ? (Integer) request.getAttribute("bookingApprovedCount") : 0;
+    int completedCount = request.getAttribute("bookingCompletedCount") != null ? (Integer) request.getAttribute("bookingCompletedCount") : 0;
+    int rejectedCount = request.getAttribute("bookingRejectedCount") != null ? (Integer) request.getAttribute("bookingRejectedCount") : 0;
+    int cancelledCount = request.getAttribute("bookingCancelledCount") != null ? (Integer) request.getAttribute("bookingCancelledCount") : 0;
+    int totalCount = request.getAttribute("bookingTotalCount") != null ? (Integer) request.getAttribute("bookingTotalCount") : 0;
+    int availableSedanCount = request.getAttribute("availableSedanCount") != null ? (Integer) request.getAttribute("availableSedanCount") : 0;
+    int availableSuvCount = request.getAttribute("availableSuvCount") != null ? (Integer) request.getAttribute("availableSuvCount") : 0;
+    boolean hasAvailableVehicle = request.getAttribute("hasAvailableVehicle") != null ? (Boolean) request.getAttribute("hasAvailableVehicle") : (availableSedanCount > 0 || availableSuvCount > 0);
+    String defaultVehicleType = (String) request.getAttribute("defaultVehicleType");
+%>
+<%!
+    private String esc(String value) {
+        if (value == null) {
+            return "";
         }
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#x27;");
     }
+
+    private String formatDate(BookingRequest booking, boolean isReturn) {
+        if (booking == null) {
+            return "-";
+        }
+        java.time.LocalDate date = isReturn ? booking.getReturnDate() : booking.getTripDate();
+        return date == null ? "-" : date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
+
+    private String safeRequestCode(BookingRequest booking) {
+        return booking != null && booking.getRequestCode() != null && !booking.getRequestCode().trim().isEmpty()
+                ? booking.getRequestCode()
+                : "BK-" + (booking == null ? "" : booking.getId());
+    }
+
+    private String statusLabel(BookingRequest booking) {
+        if (booking == null || booking.getStatus() == null) {
+            return "UNKNOWN";
+        }
+        return booking.getStatus().name();
+    }
+
+    private String statusBadgeClass(String status) {
+        if ("PENDING".equals(status)) {
+            return "bg-amber-100 text-amber-800";
+        }
+        if ("APPROVED".equals(status)) {
+            return "bg-primary-container text-primary-fixed-dim";
+        }
+        if ("COMPLETED".equals(status)) {
+            return "bg-emerald-100 text-emerald-800";
+        }
+        if ("REJECTED".equals(status) || "CANCELLED".equals(status)) {
+            return "bg-error-container text-on-error-container";
+        }
+        return "bg-surface-container-high text-on-surface";
+    }
+
+    private String money(java.math.BigDecimal value) {
+        if (value == null) {
+            return "0.00";
+        }
+        return value.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+%>
+<%
+    String flashMessage = (String) session.getAttribute("message");
+    String flashType = (String) session.getAttribute("messageType");
 %>
 <!DOCTYPE html>
 <html class="light" lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Campus Vehicle Booking | Request Management</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <style>
-        :root {
-            --umt-navy: #042b61;
-            --umt-blue: #1363c6;
-            --umt-gold: #f7b718;
-        }
-        body { font-family: "Plus Jakarta Sans", sans-serif; }
-        .headline { font-family: "Manrope", sans-serif; }
-        .code-pill { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-900">
-    <jsp:include page="/partials/sidebar.jsp"><jsp:param name="active" value="booking" /></jsp:include>
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+        <title>Campus Vehicle Booking System | Booking Requests</title>
+        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+        <script src="${pageContext.request.contextPath}/assets/js/tailwind.config.js"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <link href="${pageContext.request.contextPath}/assets/css/fleet-management.css" rel="stylesheet"/>
+    </head>
+    <body class="bg-surface text-on-surface font-body selection:bg-secondary-container">
+        <jsp:include page="/partials/sidebar.jsp">
+            <jsp:param name="active" value="booking" />
+        </jsp:include>
 
-    <main class="pl-0 md:pl-64 min-h-screen">
-        <jsp:include page="/partials/navbar.jsp" />
+        <main class="pl-64 min-h-screen">
+            <jsp:include page="/partials/navbar.jsp" />
 
-        <div class="pt-24 px-4 md:px-8 pb-10 space-y-6">
-            <section class="flex flex-col gap-2">
-                <h1 class="headline text-3xl font-extrabold tracking-tight">Booking Request Management</h1>
-                <p class="text-slate-500">Create, track, edit, and cancel requests while status is still pending.</p>
-            </section>
-
-            <c:if test="${not empty sessionScope.message}">
-                <div class="p-4 rounded-xl border flex items-center gap-3 ${sessionScope.messageType == 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}">
-                    <span class="material-symbols-outlined">${sessionScope.messageType == 'success' ? 'check_circle' : 'error'}</span>
-                    <p class="font-medium">${sessionScope.message}</p>
-                </div>
-                <% session.removeAttribute("message"); session.removeAttribute("messageType"); %>
-            </c:if>
-
-            <section class="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p class="text-xs font-bold uppercase text-amber-700">Pending</p>
-                    <p class="text-2xl font-extrabold text-amber-800"><%= pendingCount %></p>
-                </div>
-                <div class="rounded-2xl border border-green-200 bg-green-50 p-4">
-                    <p class="text-xs font-bold uppercase text-green-700">Approved</p>
-                    <p class="text-2xl font-extrabold text-green-800"><%= approvedCount %></p>
-                </div>
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <p class="text-xs font-bold uppercase text-emerald-700">Completed</p>
-                    <p class="text-2xl font-extrabold text-emerald-800"><%= completedCount %></p>
-                </div>
-                <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
-                    <p class="text-xs font-bold uppercase text-red-700">Rejected</p>
-                    <p class="text-2xl font-extrabold text-red-800"><%= rejectedCount %></p>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-100 p-4">
-                    <p class="text-xs font-bold uppercase text-slate-600">Cancelled</p>
-                    <p class="text-2xl font-extrabold text-slate-700"><%= cancelledCount %></p>
-                </div>
-            </section>
-
-            <section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                <div class="xl:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6">
-                    <div class="mb-4">
-                        <h2 class="headline text-xl font-extrabold">Create Request</h2>
-                        <p class="text-sm text-slate-500">Step 1: Trip details, Step 2: Vehicle preference, Step 3: Purpose</p>
+            <div class="pt-24 px-8 pb-12 space-y-8">
+                <section class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+                    <div class="max-w-3xl">
+                        <p class="text-xs uppercase tracking-[0.24em] font-semibold text-on-surface-variant">User module</p>
+                        <h1 class="font-headline font-extrabold text-3xl tracking-tight text-on-surface mt-2">Booking Request Studio</h1>
+                        <p class="text-on-surface-variant mt-2">
+                            Submit a request, check pricing immediately, and review your latest bookings from the same page.
+                        </p>
                     </div>
-
-                    <form id="bookingRequestForm" action="${pageContext.request.contextPath}/BookingController" method="POST" class="space-y-5">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Step 1 · Trip Details</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label class="block">
-                                    <span class="text-sm font-semibold text-slate-700">Trip Date</span>
-                                    <input type="date" name="tripDate" id="tripDate" required class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]"/>
-                                </label>
-                                <label class="block">
-                                    <span class="text-sm font-semibold text-slate-700">Return Date</span>
-                                    <input type="date" name="returnDate" id="returnDate" required class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]"/>
-                                </label>
-                                <label class="block md:col-span-2">
-                                    <span class="text-sm font-semibold text-slate-700">Destination</span>
-                                    <input type="text" name="destination" required placeholder="Example: Kuala Nerus District Office" class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]"/>
-                                </label>
-                            </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 w-full xl:w-auto">
+                        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/5 min-w-[140px]">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant mb-1">Total</p>
+                            <p class="text-2xl font-headline font-bold text-primary"><%= totalCount %></p>
                         </div>
-
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Step 2 · Vehicle Preference</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label class="block">
-                                    <span class="text-sm font-semibold text-slate-700">Passenger Count</span>
-                                    <input type="number" name="passengerCount" min="1" required class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]"/>
-                                    <p class="text-xs text-slate-400 mt-1">Minimum 1 passenger.</p>
-                                </label>
-                                <label class="block">
-                                    <span class="text-sm font-semibold text-slate-700">Vehicle Type</span>
-                                    <select name="vehicleType" required class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]">
-                                        <option value="VAN">Van</option>
-                                        <option value="MPV">MPV</option>
-                                        <option value="BUS">Bus</option>
-                                        <option value="FOUR_BY_FOUR">4x4 / SUV</option>
-                                    </select>
-                                </label>
-                            </div>
+                        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/5 min-w-[140px]">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant mb-1">Pending</p>
+                            <p class="text-2xl font-headline font-bold text-secondary"><%= pendingCount %></p>
                         </div>
-
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Step 3 · Purpose</p>
-                            <label class="block">
-                                <span class="text-sm font-semibold text-slate-700">Purpose of Trip</span>
-                                <textarea name="purpose" id="purpose" rows="4" maxlength="500" required class="mt-1 w-full rounded-xl border-slate-300 focus:ring-[var(--umt-blue)]"></textarea>
-                                <div class="flex justify-between text-xs text-slate-400 mt-1">
-                                    <span>Briefly explain official activity.</span>
-                                    <span id="purposeCount">0 / 500</span>
-                                </div>
-                            </label>
+                        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/5 min-w-[140px]">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant mb-1">Approved</p>
+                            <p class="text-2xl font-headline font-bold text-primary"><%= approvedCount %></p>
                         </div>
-
-                        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2 sticky bottom-0 bg-white">
-                            <button type="reset" class="px-6 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50">Reset</button>
-                            <button type="submit" class="px-6 py-2.5 rounded-xl text-white font-semibold" style="background: linear-gradient(120deg, var(--umt-navy), var(--umt-blue));">Submit Request</button>
+                        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/5 min-w-[140px]">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant mb-1">Completed</p>
+                            <p class="text-2xl font-headline font-bold text-emerald-600"><%= completedCount %></p>
                         </div>
-                    </form>
+                    </div>
+                </section>
+
+                <% if (flashMessage != null && !flashMessage.trim().isEmpty()) { %>
+                <div class="rounded-2xl border px-4 py-3 text-sm font-medium
+                    <%= "success".equals(flashType) ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900" %>">
+                    <strong class="block mb-1"><%= "success".equals(flashType) ? "Success" : "Notice" %></strong>
+                    <div><%= esc(flashMessage) %></div>
                 </div>
+                <%
+                    session.removeAttribute("message");
+                    session.removeAttribute("messageType");
+                %>
+                <% } %>
 
-                <div class="xl:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6">
-                    <h2 class="headline text-xl font-extrabold mb-4">My Request Timeline</h2>
-                    <div class="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-                        <c:forEach var="b" items="${bookings}" varStatus="loop">
-                            <c:if test="${loop.index < 6}">
-                                <div class="rounded-xl border p-3 ${b.status == 'PENDING' ? 'border-amber-200 bg-amber-50' : b.status == 'APPROVED' ? 'border-green-200 bg-green-50' : b.status == 'COMPLETED' ? 'border-emerald-200 bg-emerald-50' : b.status == 'REJECTED' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <span class="code-pill text-xs font-bold px-2 py-1 rounded-lg bg-white/70 border border-slate-200">${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}</span>
-                                        <span class="text-[11px] font-bold px-2 py-1 rounded-full ${b.status == 'PENDING' ? 'bg-amber-100 text-amber-800' : b.status == 'APPROVED' ? 'bg-green-100 text-green-800' : b.status == 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : b.status == 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'}">${b.status}</span>
+                <div class="space-y-6">
+                    <section class="bg-surface-container-lowest rounded-2xl border border-outline-variant/10 overflow-hidden shadow-sm">
+                        <div class="px-6 py-5 border-b border-outline-variant/10">
+                            <div>
+                                <h2 class="font-headline font-bold text-xl">Create Booking Request</h2>
+                                <p class="text-sm text-on-surface-variant mt-1">
+                                    Fill in your trip details and upload your student matrix card.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="p-6 space-y-5">
+                            <div class="rounded-2xl border border-primary/10 bg-primary/5 p-4 text-sm text-on-surface-variant">
+                                Return time is fixed to 10:00 PM. Late returns are charged at RM 25.00 per hour.
+                                Leave your matrix card at the car centre, and collect it after returning the vehicle.
+                                You can pay any delay fee at the car centre.
+                            </div>
+
+                            <div class="rounded-2xl border <%= hasAvailableVehicle ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900" %> p-4 text-sm">
+                                <% if (hasAvailableVehicle) { %>
+                                Vehicles currently available for booking: <strong>Sedan <%= availableSedanCount %></strong>, <strong>SUV <%= availableSuvCount %></strong>.
+                                <% } else { %>
+                                No vehicles are currently available. Booking submission is disabled until the fleet has at least one available vehicle.
+                                <% } %>
+                            </div>
+
+                            <form action="${pageContext.request.contextPath}/BookingController" method="POST" enctype="multipart/form-data" class="space-y-5">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label class="block">
+                                        <span class="text-sm font-semibold text-on-surface-variant">Trip Date</span>
+                                        <input type="date" id="tripDate" name="tripDate" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
+                                    </label>
+                                    <label class="block">
+                                        <span class="text-sm font-semibold text-on-surface-variant">Return Date</span>
+                                        <input type="date" id="returnDate" name="returnDate" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
+                                    </label>
+                                </div>
+
+                                <label class="block">
+                                    <span class="text-sm font-semibold text-on-surface-variant">Destination</span>
+                                    <input type="text" name="destination" required placeholder="Example: Kuala Nerus District Office" class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
+                                </label>
+
+                                <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-low p-4">
+                                    <div class="flex items-start justify-between gap-4 mb-4">
+                                        <div>
+                                            <h3 class="font-semibold text-on-surface">Vehicle Preference</h3>
+                                            <p class="text-sm text-on-surface-variant mt-1">
+                                                Passenger count is determined by the selected vehicle type.
+                                            </p>
+                                        </div>
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-surface-container-high text-on-surface-variant">
+                                            Passenger count locked
+                                        </span>
                                     </div>
-                                    <p class="text-sm font-semibold text-slate-800 mt-2">${b.destination}</p>
-                                    <p class="text-xs text-slate-500 mt-1">${b.tripDate} to ${b.returnDate}</p>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <label class="flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-white p-4 <%= availableSedanCount > 0 ? "cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5" : "opacity-50 cursor-not-allowed" %>">
+                                            <input type="radio" name="vehicleType" value="SEDAN" <%= "SEDAN".equals(defaultVehicleType) ? "checked" : "" %> <%= availableSedanCount > 0 ? "" : "disabled" %> class="mt-1 text-primary focus:ring-primary"/>
+                                            <span class="flex-1">
+                                                <span class="block font-semibold text-on-surface">Sedan</span>
+                                                <span class="block text-sm text-on-surface-variant mt-1">Best for 1 to 4 passengers. <%= availableSedanCount > 0 ? availableSedanCount + " available" : "No sedan available right now." %></span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-white p-4 <%= availableSuvCount > 0 ? "cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5" : "opacity-50 cursor-not-allowed" %>">
+                                            <input type="radio" name="vehicleType" value="SUV" <%= "SUV".equals(defaultVehicleType) ? "checked" : "" %> <%= availableSuvCount > 0 ? "" : "disabled" %> class="mt-1 text-primary focus:ring-primary"/>
+                                            <span class="flex-1">
+                                                <span class="block font-semibold text-on-surface">SUV</span>
+                                                <span class="block text-sm text-on-surface-variant mt-1">Best for 5 to 7 passengers. <%= availableSuvCount > 0 ? availableSuvCount + " available" : "No SUV available right now." %></span>
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <input type="hidden" name="passengerCount" id="passengerCount" value="<%= "SUV".equals(defaultVehicleType) ? "7" : "4" %>"/>
                                 </div>
-                            </c:if>
-                        </c:forEach>
-                        <c:if test="${empty bookings}">
-                            <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                                <p class="font-semibold text-slate-700">No bookings yet</p>
-                                <p class="text-sm text-slate-500 mt-1">Create your first request using the form.</p>
-                            </div>
-                        </c:if>
-                    </div>
-                </div>
-            </section>
 
-            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 space-y-4">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                    <h2 class="headline text-xl font-extrabold">Booking History</h2>
-                    <div class="flex flex-wrap gap-2" id="quickFilters">
-                        <button type="button" class="qf px-3 py-1.5 rounded-full text-xs font-bold border border-slate-300 bg-slate-900 text-white" data-status="ALL">All</button>
-                        <button type="button" class="qf px-3 py-1.5 rounded-full text-xs font-bold border border-amber-300 text-amber-700" data-status="PENDING">Pending</button>
-                        <button type="button" class="qf px-3 py-1.5 rounded-full text-xs font-bold border border-red-300 text-red-700" data-status="ACTION">Action Needed</button>
-                    </div>
-                </div>
+                                <label class="block">
+                                    <span class="text-sm font-semibold text-on-surface-variant">Purpose of Trip</span>
+                                    <textarea name="purpose" rows="5" maxlength="500" required placeholder="Briefly explain the official activity." class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"></textarea>
+                                </label>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <input id="searchInput" type="text" placeholder="Search code or destination" class="rounded-xl border-slate-300 md:col-span-2"/>
-                    <select id="statusFilter" class="rounded-xl border-slate-300">
-                        <option value="ALL">All Status</option>
-                        <option value="PENDING">Pending</option>
-                        <option value="APPROVED">Approved</option>
-                        <option value="COMPLETED">Completed</option>
-                        <option value="REJECTED">Rejected</option>
-                        <option value="CANCELLED">Cancelled</option>
-                    </select>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input id="fromDate" type="date" class="rounded-xl border-slate-300"/>
-                        <input id="toDate" type="date" class="rounded-xl border-slate-300"/>
-                    </div>
-                </div>
+                                <label class="block">
+                                    <span class="text-sm font-semibold text-on-surface-variant">Student Matrix Card</span>
+                                    <input type="file" name="licenseImage" accept="image/*" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-surface-tint"/>
+                                    <span class="mt-2 block text-sm text-on-surface-variant">Upload a clear image. PNG, JPG, and JPEG are supported.</span>
+                                </label>
 
-                <div class="hidden md:block overflow-x-auto border border-slate-200 rounded-xl">
-                    <table class="w-full text-left">
-                        <thead class="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                                <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Request</th>
-                                <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Date</th>
-                                <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Destination</th>
-                                <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500">Status</th>
-                                <th class="px-4 py-3 text-xs font-bold uppercase text-slate-500 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyRows" class="divide-y divide-slate-100">
-                        <c:forEach var="b" items="${bookings}">
-                            <tr class="history-row hover:bg-slate-50"
-                                data-code="${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}"
-                                data-destination="${b.destination}"
-                                data-status="${b.status}"
-                                data-trip="${b.tripDate}"
-                                data-return="${b.returnDate}"
-                                data-id="${b.id}">
-                                <td class="px-4 py-3"><span class="code-pill text-xs font-bold px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100">${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}</span></td>
-                                <td class="px-4 py-3 text-sm text-slate-600">${b.tripDate}</td>
-                                <td class="px-4 py-3 text-sm font-medium">${b.destination}</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold ${b.status == 'PENDING' ? 'bg-amber-100 text-amber-700' : b.status == 'APPROVED' ? 'bg-green-100 text-green-700' : b.status == 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : b.status == 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'}">${b.status}</span>
-                                </td>
-                                <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                                    <button type="button"
-                                            class="quick-view inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                                            data-code="${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}" data-destination="${b.destination}" data-trip="${b.tripDate}" data-return="${b.returnDate}" data-status="${b.status}">
-                                        Quick View
-                                    </button>
-                                    <a href="${pageContext.request.contextPath}/BookingController?action=detail&id=${b.id}"
-                                       class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
-                                        ${b.status == 'PENDING' ? 'Edit' : 'View'}
+                                <div class="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-3 pt-2">
+                                    <a href="${pageContext.request.contextPath}/pages/user/userDashboard.jsp" class="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors">
+                                        Back to Dashboard
                                     </a>
-                                    <c:if test="${b.status == 'PENDING'}">
-                                        <button type="button"
-                                                class="cancel-btn inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700"
-                                                data-id="${b.id}" data-code="${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}">
-                                            Cancel
+                                    <div class="flex flex-col sm:flex-row gap-3">
+                                        <button type="reset" class="px-5 py-3 rounded-xl border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors">
+                                            Reset
                                         </button>
-                                    </c:if>
-                                </td>
-                            </tr>
-                        </c:forEach>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="historyCards" class="md:hidden space-y-3">
-                    <c:forEach var="b" items="${bookings}">
-                        <div class="history-card rounded-xl border border-slate-200 p-4"
-                             data-code="${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}"
-                             data-destination="${b.destination}"
-                             data-status="${b.status}"
-                             data-trip="${b.tripDate}">
-                            <div class="flex justify-between items-center gap-2">
-                                <span class="code-pill text-xs font-bold px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100">${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}</span>
-                                <span class="px-2.5 py-1 rounded-full text-xs font-bold ${b.status == 'PENDING' ? 'bg-amber-100 text-amber-700' : b.status == 'APPROVED' ? 'bg-green-100 text-green-700' : b.status == 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : b.status == 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'}">${b.status}</span>
-                            </div>
-                            <p class="font-semibold text-slate-800 mt-2">${b.destination}</p>
-                            <p class="text-xs text-slate-500">${b.tripDate} to ${b.returnDate}</p>
-                            <div class="mt-3 flex gap-2">
-                                <a href="${pageContext.request.contextPath}/BookingController?action=detail&id=${b.id}" class="text-blue-600 text-sm font-semibold">${b.status == 'PENDING' ? 'Edit' : 'View'}</a>
-                                <c:if test="${b.status == 'PENDING'}">
-                                    <button type="button" class="cancel-btn text-red-600 text-sm font-semibold" data-id="${b.id}" data-code="${b.requestCode != null ? b.requestCode : 'BK-'.concat(b.id)}">Cancel</button>
-                                </c:if>
-                            </div>
+                                        <button type="submit" <%= hasAvailableVehicle ? "" : "disabled" %> class="px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-surface-tint text-white font-semibold shadow-sm <%= hasAvailableVehicle ? "hover:opacity-90" : "opacity-50 cursor-not-allowed" %>">
+                                            Submit Request
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
-                    </c:forEach>
+                    </section>
+
+                    <section class="bg-surface-container-lowest rounded-2xl border border-outline-variant/10 overflow-hidden shadow-sm">
+                        <div class="px-6 py-5 border-b border-outline-variant/10">
+                            <h2 class="font-headline font-bold text-lg">Recent Requests</h2>
+                            <p class="text-sm text-on-surface-variant mt-1">Your latest booking entries in a compact table.</p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse" data-sortable-table="true">
+                                <thead>
+                                    <tr class="bg-surface-container-high/50 text-left">
+                                        <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Request ID</th>
+                                        <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="date">Trip</th>
+                                        <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Destination</th>
+                                        <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Status</th>
+                                        <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-surface">
+                                    <% if (bookingList == null || bookingList.isEmpty()) { %>
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-8 text-center text-sm text-on-surface-variant">
+                                            No booking requests found yet.
+                                        </td>
+                                    </tr>
+                                    <% } else {
+                                        for (BookingRequest booking : bookingList) {
+                                            String status = statusLabel(booking);
+                                            String requestId = safeRequestCode(booking);
+                                            String badgeClass = statusBadgeClass(status);
+                                            boolean canPay = booking.getStatus() == BookingRequest.Status.APPROVED;
+                                            boolean canCancel = booking.getStatus() == BookingRequest.Status.PENDING;
+                                    %>
+                                    <tr class="hover:bg-surface-container-low/60">
+                                        <td class="px-6 py-4 font-semibold text-primary"><%= esc(requestId) %></td>
+                                        <td class="px-6 py-4 text-sm text-on-surface-variant" data-sort-value="<%= booking.getTripDate() == null ? "" : booking.getTripDate() %>">
+                                            <%= esc(formatDate(booking, false)) %> to <%= esc(formatDate(booking, true)) %>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-on-surface"><%= esc(booking.getDestination()) %></td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-3 py-1 rounded-full text-xs font-bold <%= badgeClass %>"><%= esc(status) %></span>
+                                            <% if ("REJECTED".equals(status) && booking.getRejectionReason() != null && !booking.getRejectionReason().trim().isEmpty()) { %>
+                                            <div class="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-800">
+                                                <span class="font-bold uppercase tracking-wide">Reason:</span>
+                                                <span><%= esc(booking.getRejectionReason()) %></span>
+                                            </div>
+                                            <% } %>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex flex-wrap gap-2">
+                                                <a href="${pageContext.request.contextPath}/BookingController?action=detail&id=<%= booking.getId() %>" class="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-outline-variant/30 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors">
+                                                    View
+                                                </a>
+                                                <% if (canPay) { %>
+                                                <a href="${pageContext.request.contextPath}/pages/user/payment.jsp?id=<%= booking.getId() %>" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                                                    Make Payment
+                                                </a>
+                                                <% } %>
+                                                <% if (canCancel) { %>
+                                                <form action="${pageContext.request.contextPath}/BookingController" method="POST" onsubmit="return confirm('Cancel this booking request?');">
+                                                    <input type="hidden" name="action" value="cancel"/>
+                                                    <input type="hidden" name="id" value="<%= booking.getId() %>"/>
+                                                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-error text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                                                        Cancel
+                                                    </button>
+                                                </form>
+                                                <% } %>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <%   }
+                                       } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
-            </section>
-        </div>
-    </main>
+            </div>
+        </main>
 
-    <div id="cancelModal" class="hidden fixed inset-0 bg-black/50 z-[999] items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md p-6">
-            <h3 class="headline text-xl font-extrabold text-slate-900">Cancel Booking</h3>
-            <p class="text-sm text-slate-500 mt-2">Are you sure you want to cancel <span id="cancelCode" class="font-bold text-slate-800"></span>?</p>
-            <form id="cancelForm" action="${pageContext.request.contextPath}/BookingController" method="POST" class="mt-5 flex justify-end gap-2">
-                <input type="hidden" name="action" value="cancel"/>
-                <input type="hidden" name="id" id="cancelId"/>
-                <button type="button" id="cancelClose" class="px-4 py-2 rounded-lg border border-slate-300">Back</button>
-                <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold">Confirm Cancel</button>
-            </form>
-        </div>
-    </div>
+        <script>
+            const vehicleInputs = document.querySelectorAll('input[name="vehicleType"]');
+            const passengerCount = document.getElementById('passengerCount');
+            const presets = {
+                SEDAN: 4,
+                SUV: 7
+            };
 
-    <div id="quickDrawer" class="hidden fixed top-0 right-0 h-full w-full sm:w-[380px] bg-white shadow-2xl z-[998] border-l border-slate-200">
-        <div class="p-5 border-b border-slate-200 flex justify-between items-center">
-            <h3 class="headline text-lg font-extrabold">Request Detail</h3>
-            <button id="drawerClose" type="button" class="text-slate-500">✕</button>
-        </div>
-        <div class="p-5 space-y-3 text-sm">
-            <div><p class="text-slate-500">Request Code</p><p id="dCode" class="font-bold"></p></div>
-            <div><p class="text-slate-500">Destination</p><p id="dDestination" class="font-bold"></p></div>
-            <div><p class="text-slate-500">Trip Date</p><p id="dTrip" class="font-bold"></p></div>
-            <div><p class="text-slate-500">Return Date</p><p id="dReturn" class="font-bold"></p></div>
-            <div><p class="text-slate-500">Status</p><p id="dStatus" class="font-bold"></p></div>
-        </div>
-    </div>
+            function syncPassengerCount() {
+                const selected = document.querySelector('input[name="vehicleType"]:checked');
+                if (!selected || !passengerCount) {
+                    return;
+                }
+                passengerCount.value = presets[selected.value] || 4;
+            }
 
-    <script>
-        const tripDateInput = document.getElementById('tripDate');
-        const returnDateInput = document.getElementById('returnDate');
-        const today = new Date().toISOString().split('T')[0];
-        tripDateInput.setAttribute('min', today);
-        tripDateInput.addEventListener('change', () => {
-            returnDateInput.setAttribute('min', tripDateInput.value);
-        });
-
-        const purpose = document.getElementById('purpose');
-        const purposeCount = document.getElementById('purposeCount');
-        purpose.addEventListener('input', () => {
-            purposeCount.textContent = `${purpose.value.length} / 500`;
-        });
-
-        const rows = Array.from(document.querySelectorAll('.history-row'));
-        const cards = Array.from(document.querySelectorAll('.history-card'));
-        const statusFilter = document.getElementById('statusFilter');
-        const searchInput = document.getElementById('searchInput');
-        const fromDate = document.getElementById('fromDate');
-        const toDate = document.getElementById('toDate');
-        const quickButtons = Array.from(document.querySelectorAll('.qf'));
-
-        function statusMatches(target, value) {
-            if (value === 'ALL') return true;
-            if (value === 'ACTION') return target === 'PENDING' || target === 'REJECTED';
-            return target === value;
-        }
-
-        function applyFilters(quick = null) {
-            const query = searchInput.value.trim().toLowerCase();
-            const status = quick || statusFilter.value;
-            const from = fromDate.value;
-            const to = toDate.value;
-
-            rows.forEach((row) => {
-                const code = (row.dataset.code || '').toLowerCase();
-                const destination = (row.dataset.destination || '').toLowerCase();
-                const s = row.dataset.status || '';
-                const trip = row.dataset.trip || '';
-
-                const queryOK = !query || code.includes(query) || destination.includes(query);
-                const statusOK = statusMatches(s, status);
-                const fromOK = !from || trip >= from;
-                const toOK = !to || trip <= to;
-                row.style.display = queryOK && statusOK && fromOK && toOK ? '' : 'none';
+            vehicleInputs.forEach((input) => {
+                input.addEventListener('change', syncPassengerCount);
             });
-
-            cards.forEach((card) => {
-                const code = (card.dataset.code || '').toLowerCase();
-                const destination = (card.dataset.destination || '').toLowerCase();
-                const s = card.dataset.status || '';
-                const trip = card.dataset.trip || '';
-
-                const queryOK = !query || code.includes(query) || destination.includes(query);
-                const statusOK = statusMatches(s, status);
-                const fromOK = !from || trip >= from;
-                const toOK = !to || trip <= to;
-                card.style.display = queryOK && statusOK && fromOK && toOK ? '' : 'none';
-            });
-        }
-
-        [statusFilter, searchInput, fromDate, toDate].forEach((el) => el.addEventListener('input', () => applyFilters()));
-        quickButtons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                quickButtons.forEach((b) => {
-                    b.classList.remove('bg-slate-900', 'text-white');
-                    b.classList.add('text-slate-700');
-                });
-                btn.classList.add('bg-slate-900', 'text-white');
-                applyFilters(btn.dataset.status);
-            });
-        });
-
-        const cancelModal = document.getElementById('cancelModal');
-        const cancelClose = document.getElementById('cancelClose');
-        const cancelCode = document.getElementById('cancelCode');
-        const cancelId = document.getElementById('cancelId');
-        document.querySelectorAll('.cancel-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                cancelCode.textContent = btn.dataset.code;
-                cancelId.value = btn.dataset.id;
-                cancelModal.classList.remove('hidden');
-                cancelModal.classList.add('flex');
-            });
-        });
-        cancelClose.addEventListener('click', () => {
-            cancelModal.classList.add('hidden');
-            cancelModal.classList.remove('flex');
-        });
-
-        const drawer = document.getElementById('quickDrawer');
-        const drawerClose = document.getElementById('drawerClose');
-        document.querySelectorAll('.quick-view').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                document.getElementById('dCode').textContent = btn.dataset.code;
-                document.getElementById('dDestination').textContent = btn.dataset.destination;
-                document.getElementById('dTrip').textContent = btn.dataset.trip;
-                document.getElementById('dReturn').textContent = btn.dataset.return;
-                document.getElementById('dStatus').textContent = btn.dataset.status;
-                drawer.classList.remove('hidden');
-            });
-        });
-        drawerClose.addEventListener('click', () => drawer.classList.add('hidden'));
-    </script>
-</body>
+            syncPassengerCount();
+        </script>
+        <script src="${pageContext.request.contextPath}/assets/js/table-sort.js"></script>
+    </body>
 </html>

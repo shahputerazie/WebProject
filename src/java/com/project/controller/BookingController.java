@@ -1,21 +1,38 @@
 package com.project.controller;
 
 import com.project.dao.BookingDAO;
+import com.project.dao.BookingDAO.BookingDashboardData;
+import com.project.dao.BookingDAO.BookingStats;
+import com.project.dao.VehicleDAO;
 import com.project.model.BookingRequest;
 import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.servlet.http.Part;
 
 @WebServlet("/BookingController")
+@MultipartConfig(maxFileSize = 5 * 1024 * 1024, maxRequestSize = 10 * 1024 * 1024)
 public class BookingController extends HttpServlet {
 
     private final BookingDAO dao = new BookingDAO();
+    private final VehicleDAO vehicleDAO = new VehicleDAO();
+    private static final LocalTime RETURN_WINDOW_END = LocalTime.of(22, 0);
+    private static final BigDecimal LATE_FEE_PER_HOUR = new BigDecimal("25.00");
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -34,9 +51,23 @@ public class BookingController extends HttpServlet {
         if ("detail".equalsIgnoreCase(action)) {
             showBookingDetail(request, response, userId);
         } else {
-            // Fetch list for the table and forward to JSP
-            List<BookingRequest> bookings = dao.getBookingsByUserId(userId);
-            request.setAttribute("bookings", bookings);
+            BookingDashboardData dashboardData = dao.getBookingDashboardDataByUserId(userId, 8);
+            BookingStats stats = dashboardData.getStats();
+            int availableSedanCount = vehicleDAO.countAvailableVehiclesByType("SEDAN");
+            int availableSuvCount = vehicleDAO.countAvailableVehiclesByType("SUV");
+            String defaultVehicleType = availableSedanCount > 0 ? "SEDAN" : (availableSuvCount > 0 ? "SUV" : null);
+            request.setAttribute("bookings", dashboardData.getRecentBookings());
+            request.setAttribute("bookingTotalCount", stats.getTotalRequests());
+            request.setAttribute("bookingPendingCount", stats.getPendingRequests());
+            request.setAttribute("bookingApprovedCount", stats.getApprovedRequests());
+            request.setAttribute("bookingCompletedCount", stats.getCompletedRequests());
+            request.setAttribute("bookingRejectedCount", stats.getRejectedRequests());
+            request.setAttribute("bookingCancelledCount", stats.getCancelledRequests());
+            request.setAttribute("bookingRecentLimit", 8);
+            request.setAttribute("availableSedanCount", availableSedanCount);
+            request.setAttribute("availableSuvCount", availableSuvCount);
+            request.setAttribute("hasAvailableVehicle", availableSedanCount > 0 || availableSuvCount > 0);
+            request.setAttribute("defaultVehicleType", defaultVehicleType);
             request.getRequestDispatcher("/pages/user/bookingRequest.jsp").forward(request, response);
         }
     }
@@ -65,28 +96,64 @@ public class BookingController extends HttpServlet {
         try {
             String tripDateParam = request.getParameter("tripDate");
             String returnDateParam = request.getParameter("returnDate");
+            String vehicleTypeParam = request.getParameter("vehicleType");
+            Part licensePart = request.getPart("licenseImage");
 
             if (anyBlank(tripDateParam, returnDateParam, request.getParameter("destination"),
-                    request.getParameter("passengerCount"), request.getParameter("vehicleType"))) {
-                setSessionMessage(request, "All fields are required.", "error");
+                    request.getParameter("passengerCount"), vehicleTypeParam, request.getParameter("purpose"))) {
+                setSessionMessage(request, "All fields are required, including the license photo.", "error");
+            } else if (licensePart == null || licensePart.getSize() == 0) {
+                setSessionMessage(request, "Please upload a clear picture of the student matrix card.", "error");
             } else {
-                BookingRequest b = new BookingRequest();
-                b.setUserId(userId);
-                b.setTripDate(LocalDate.parse(tripDateParam));
-                b.setReturnDate(LocalDate.parse(returnDateParam));
-                b.setDestination(request.getParameter("destination").trim());
-                b.setPassengerCount(Integer.parseInt(request.getParameter("passengerCount")));
-                b.setVehicleType(BookingRequest.VehicleType.valueOf(request.getParameter("vehicleType")));
-                b.setPurpose(request.getParameter("purpose").trim());
-                b.setStatus(BookingRequest.Status.PENDING);
-                b.setRequestCode(dao.generateRequestCode());
+                LocalDate tripDate = LocalDate.parse(tripDateParam);
+                LocalDate returnDate = LocalDate.parse(returnDateParam);
+                LocalTime returnTime = RETURN_WINDOW_END;
 
-                if (dao.addBooking(b)) {
-                    setSessionMessage(request, "Booking " + b.getRequestCode() + " submitted!", "success");
+                if (returnDate.isBefore(tripDate)) {
+                    setSessionMessage(request, "Return date must be on or after the trip date.", "error");
                 } else {
-                    setSessionMessage(request, "Database error. Please try again.", "error");
+                    BookingRequest.VehicleType vehicleType = BookingRequest.VehicleType.valueOf(vehicleTypeParam);
+                    if (!hasAvailableVehicle(vehicleType)) {
+                        setSessionMessage(request, "No available vehicle matches the selected type. Please choose another type or try again later.", "error");
+                        response.sendRedirect(request.getContextPath() + "/BookingController");
+                        return;
+                    }
+                    int passengerCount = getPassengerPreset(vehicleType);
+                    BigDecimal dailyRate = getDailyRate(vehicleType);
+                    long rentalDays = calculateRentalDays(tripDate, returnDate);
+                    BigDecimal estimatedFee = dailyRate.multiply(BigDecimal.valueOf(rentalDays)).setScale(2, java.math.RoundingMode.HALF_UP);
+                    String licenseImagePath = saveLicenseImage(request, licensePart, userId);
+
+                    if (licenseImagePath == null) {
+                        setSessionMessage(request, "Unable to save the matrix card image. Please try again.", "error");
+                    } else {
+                        BookingRequest b = new BookingRequest();
+                        b.setUserId(userId);
+                        b.setTripDate(tripDate);
+                        b.setReturnDate(returnDate);
+                        b.setReturnTime(returnTime);
+                        b.setDestination(request.getParameter("destination").trim());
+                        b.setPassengerCount(passengerCount);
+                        b.setVehicleType(vehicleType);
+                        b.setPurpose(request.getParameter("purpose").trim());
+                        b.setLicenseImagePath(licenseImagePath);
+                        b.setDailyRentalFee(dailyRate);
+                        b.setLateFeePerHour(LATE_FEE_PER_HOUR);
+                        b.setEstimatedRentalFee(estimatedFee);
+                        b.setStatus(BookingRequest.Status.PENDING);
+                        b.setRequestCode(dao.generateRequestCode());
+
+                        if (dao.addBooking(b)) {
+                            setSessionMessage(request, "Booking " + b.getRequestCode()
+                                    + " submitted! Estimated rental fee: RM " + estimatedFee, "success");
+                        } else {
+                            setSessionMessage(request, "Database error. Please try again.", "error");
+                        }
+                    }
                 }
             }
+        } catch (IllegalArgumentException ex) {
+            setSessionMessage(request, "Invalid vehicle type.", "error");
         } catch (Exception e) {
             setSessionMessage(request, "Error: " + e.getMessage(), "error");
         }
@@ -122,17 +189,57 @@ public class BookingController extends HttpServlet {
     private void updateBooking(HttpServletRequest request, HttpServletResponse response, Long userId) throws IOException {
         try {
             long bookingId = Long.parseLong(request.getParameter("id"));
-            BookingRequest b = new BookingRequest();
-            b.setId(bookingId);
-            b.setTripDate(LocalDate.parse(request.getParameter("tripDate")));
-            b.setReturnDate(LocalDate.parse(request.getParameter("returnDate")));
-            b.setDestination(request.getParameter("destination").trim());
-            b.setPassengerCount(Integer.parseInt(request.getParameter("passengerCount")));
-            b.setVehicleType(BookingRequest.VehicleType.valueOf(request.getParameter("vehicleType")));
-            b.setPurpose(request.getParameter("purpose").trim());
+            BookingRequest existing = dao.getBookingByIdAndUserId(bookingId, userId);
+            if (existing == null || existing.getStatus() != BookingRequest.Status.PENDING) {
+                setSessionMessage(request, "Only pending bookings can be updated.", "error");
+                response.sendRedirect(request.getContextPath() + "/BookingController");
+                return;
+            }
 
-            boolean ok = dao.updatePendingBookingForUser(b, userId);
-            setSessionMessage(request, ok ? "Booking updated successfully." : "Only pending bookings can be updated.", ok ? "success" : "error");
+            String tripDateParam = request.getParameter("tripDate");
+            String returnDateParam = request.getParameter("returnDate");
+            String vehicleTypeParam = request.getParameter("vehicleType");
+
+            if (anyBlank(tripDateParam, returnDateParam, request.getParameter("destination"),
+                    request.getParameter("passengerCount"), vehicleTypeParam, request.getParameter("purpose"))) {
+                setSessionMessage(request, "Please fill in all required fields.", "error");
+            } else {
+                LocalDate tripDate = LocalDate.parse(tripDateParam);
+                LocalDate returnDate = LocalDate.parse(returnDateParam);
+                LocalTime returnTime = RETURN_WINDOW_END;
+
+                if (returnDate.isBefore(tripDate)) {
+                    setSessionMessage(request, "Return date must be on or after the trip date.", "error");
+                } else {
+                    BookingRequest.VehicleType vehicleType = BookingRequest.VehicleType.valueOf(vehicleTypeParam);
+                    if (!hasAvailableVehicle(vehicleType)) {
+                        setSessionMessage(request, "No available vehicle matches the selected type. Please choose another type or try again later.", "error");
+                        response.sendRedirect(request.getContextPath() + "/BookingController");
+                        return;
+                    }
+                    int passengerCount = getPassengerPreset(vehicleType);
+                    BigDecimal dailyRate = getDailyRate(vehicleType);
+                    long rentalDays = calculateRentalDays(tripDate, returnDate);
+                    BigDecimal estimatedFee = dailyRate.multiply(BigDecimal.valueOf(rentalDays)).setScale(2, java.math.RoundingMode.HALF_UP);
+
+                    BookingRequest b = new BookingRequest();
+                    b.setId(bookingId);
+                    b.setTripDate(tripDate);
+                    b.setReturnDate(returnDate);
+                    b.setReturnTime(returnTime);
+                    b.setDestination(request.getParameter("destination").trim());
+                    b.setPassengerCount(passengerCount);
+                    b.setVehicleType(vehicleType);
+                    b.setPurpose(request.getParameter("purpose").trim());
+                    b.setDailyRentalFee(dailyRate);
+                    b.setLateFeePerHour(LATE_FEE_PER_HOUR);
+                    b.setEstimatedRentalFee(estimatedFee);
+
+                    boolean ok = dao.updatePendingBookingForUser(b, userId);
+                    setSessionMessage(request, ok ? "Booking updated successfully." : "Only pending bookings can be updated.",
+                            ok ? "success" : "error");
+                }
+            }
         } catch (Exception e) {
             setSessionMessage(request, "Invalid booking update request.", "error");
         }
@@ -143,7 +250,8 @@ public class BookingController extends HttpServlet {
         try {
             long bookingId = Long.parseLong(request.getParameter("id"));
             boolean ok = dao.cancelPendingBookingForUser(bookingId, userId);
-            setSessionMessage(request, ok ? "Booking cancelled successfully." : "Only pending bookings can be cancelled.", ok ? "success" : "error");
+            setSessionMessage(request, ok ? "Booking cancelled successfully." : "Only pending bookings can be cancelled.",
+                    ok ? "success" : "error");
         } catch (Exception e) {
             setSessionMessage(request, "Invalid cancel request.", "error");
         }
@@ -177,5 +285,109 @@ public class BookingController extends HttpServlet {
                 ? ((String) session.getAttribute("role")).trim().toUpperCase()
                 : null;
         return "STUDENT".equals(role) || "LECTURER".equals(role);
+    }
+
+    private String saveLicenseImage(HttpServletRequest request, Part part, Long userId) {
+        try {
+            String submittedFileName = part.getSubmittedFileName();
+            if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
+                return null;
+            }
+
+            String lower = submittedFileName.toLowerCase();
+            if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp"))) {
+                return null;
+            }
+
+            String fileName = "license-" + userId + "-" + System.currentTimeMillis() + getFileExtension(submittedFileName);
+            String relativePath = "/assets/uploads/licenses/" + fileName;
+
+            String realDir = request.getServletContext().getRealPath("/assets/uploads/licenses");
+            if (realDir == null) {
+                return null;
+            }
+
+            Path dir = Paths.get(realDir);
+            Files.createDirectories(dir);
+            Path target = dir.resolve(fileName);
+            try (InputStream input = part.getInputStream()) {
+                Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            return relativePath;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String getFileExtension(String fileName) {
+        int idx = fileName.lastIndexOf('.');
+        return (idx >= 0) ? fileName.substring(idx).toLowerCase() : "";
+    }
+
+    private boolean hasAvailableVehicle(BookingRequest.VehicleType vehicleType) {
+        return vehicleType != null && vehicleDAO.countAvailableVehiclesByType(vehicleType.name()) > 0;
+    }
+
+    private long calculateRentalDays(LocalDate tripDate, LocalDate returnDate) {
+        long days = ChronoUnit.DAYS.between(tripDate, returnDate) + 1;
+        return Math.max(days, 1);
+    }
+
+    private BigDecimal getDailyRate(BookingRequest.VehicleType vehicleType) {
+        if (vehicleType == null) {
+            return new BigDecimal("0.00");
+        }
+        switch (vehicleType) {
+            case SEDAN:
+                return new BigDecimal("80.00");
+            case SUV:
+                return new BigDecimal("130.00");
+            default:
+                return new BigDecimal("0.00");
+        }
+    }
+
+    private int getPassengerLimit(BookingRequest.VehicleType vehicleType) {
+        if (vehicleType == null) {
+            return 1;
+        }
+        switch (vehicleType) {
+            case SEDAN:
+                return 4;
+            case SUV:
+                return 7;
+            default:
+                return 1;
+        }
+    }
+
+    private int getPassengerPreset(BookingRequest.VehicleType vehicleType) {
+        if (vehicleType == null) {
+            return 1;
+        }
+        switch (vehicleType) {
+            case SEDAN:
+                return 4;
+            case SUV:
+                return 7;
+            default:
+                return 1;
+        }
+    }
+
+    private String getVehicleLabel(BookingRequest.VehicleType vehicleType) {
+        if (vehicleType == null) {
+            return "vehicle";
+        }
+        switch (vehicleType) {
+            case SEDAN:
+                return "Sedan";
+            case SUV:
+                return "SUV";
+            default:
+                return "vehicle";
+        }
     }
 }

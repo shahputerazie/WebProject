@@ -58,19 +58,12 @@
                             <select name="type"
                                     class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     required>
-                                <option value="Bus">Bus</option>
-                                <option value="Van">Van</option>
+                                <option value="SEDAN">Sedan</option>
                                 <option value="SUV">SUV</option>
-                                <option value="Sedan">Sedan</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Seating Capacity</label>
-                            <input type="number" name="capacity" min="1"
-                                   class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="e.g. 40"
-                                   required>
+                            <p class="mt-2 text-xs text-gray-500">
+                                Seating capacity is set automatically from the selected vehicle type.
+                            </p>
                         </div>
 
                         <div>

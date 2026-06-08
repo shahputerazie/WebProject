@@ -44,12 +44,11 @@ public class LoginController extends HttpServlet {
         session.setAttribute("role", role);
 
         if ("ADMIN".equals(role)) {
-            response.sendRedirect(request.getContextPath() + "/pages/admin/adminDashboard.jsp");
+            response.sendRedirect(request.getContextPath() + "/pages/admin/dashboard.jsp");
         } else if ("STAFF".equals(role)) {
-            response.sendRedirect(request.getContextPath() + "/VehicleController?action=list");
+            response.sendRedirect(request.getContextPath() + "/pages/staff/dashboard.jsp");
         } else {
             response.sendRedirect(request.getContextPath() + "/pages/user/userDashboard.jsp");
         }
     }
 }
-

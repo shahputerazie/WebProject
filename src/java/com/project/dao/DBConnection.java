@@ -10,16 +10,17 @@ public class DBConnection {
             = "jdbc:mysql://localhost:3306/campus_vehicle_booking?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC";
 
     private static final String USER = "root";
-    private static final String PASSWORD = "admin123"; 
+    private static final String PASSWORD = "admin123";
 
-    public static Connection getConnection() throws SQLException {
+    static {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-            System.out.println("CONNECTED TO DB: " + conn.getCatalog());
-            return conn;
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException("MySQL JDBC Driver not found!", e);
+            throw new ExceptionInInitializerError("MySQL JDBC Driver not found!");
         }
+    }
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }

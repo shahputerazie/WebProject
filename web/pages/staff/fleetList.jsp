@@ -1,4 +1,3 @@
-```jsp
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 
@@ -107,11 +106,9 @@
                             <select name="type"
                                     class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500">
 
-                                <option value="">All Types</option>
-                                <option value="Bus">Bus</option>
-                                <option value="Van">Van</option>
-                                <option value="SUV">SUV</option>
-                                <option value="Sedan">Sedan</option>
+                                <option value="" ${empty param.type ? 'selected' : ''}>All Types</option>
+                                <option value="SEDAN" ${param.type == 'SEDAN' ? 'selected' : ''}>Sedan</option>
+                                <option value="SUV" ${param.type == 'SUV' ? 'selected' : ''}>SUV</option>
 
                             </select>
                         </div>
@@ -125,10 +122,10 @@
                             <select name="status"
                                     class="w-full rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-500">
 
-                                <option value="">All Status</option>
-                                <option value="AVAILABLE">Available</option>
-                                <option value="MAINTENANCE">Maintenance</option>
-                                <option value="UNAVAILABLE">Unavailable</option>
+                                <option value="" ${empty param.status ? 'selected' : ''}>All Status</option>
+                                <option value="AVAILABLE" ${param.status == 'AVAILABLE' ? 'selected' : ''}>Available</option>
+                                <option value="MAINTENANCE" ${param.status == 'MAINTENANCE' ? 'selected' : ''}>Maintenance</option>
+                                <option value="UNAVAILABLE" ${param.status == 'UNAVAILABLE' ? 'selected' : ''}>Unavailable</option>
 
                             </select>
                         </div>
@@ -172,16 +169,16 @@
                     </div>
 
                     <!-- Table -->
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-left border-collapse" data-sortable-table="true">
 
                         <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
 
                             <tr>
                                 <th class="p-4 font-semibold">No.</th>
-                                <th class="p-4 font-semibold">License Plate</th>
-                                <th class="p-4 font-semibold">Type</th>
-                                <th class="p-4 font-semibold">Capacity</th>
-                                <th class="p-4 font-semibold">Status</th>
+                                <th class="p-4 font-semibold" data-sortable-type="text">License Plate</th>
+                                <th class="p-4 font-semibold" data-sortable-type="text">Type</th>
+                                <th class="p-4 font-semibold" data-sortable-type="number">Capacity</th>
+                                <th class="p-4 font-semibold" data-sortable-type="text">Status</th>
                                 <th class="p-4 font-semibold text-right">Actions</th>
                             </tr>
 
@@ -289,8 +286,8 @@
             </div>
 
         </main>
+        <script src="${pageContext.request.contextPath}/assets/js/table-sort.js"></script>
 
     </body>
 
 </html>
-```
