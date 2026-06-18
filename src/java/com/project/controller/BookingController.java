@@ -3,6 +3,7 @@ package com.project.controller;
 import com.project.dao.BookingDAO;
 import com.project.dao.BookingDAO.BookingDashboardData;
 import com.project.dao.BookingDAO.BookingStats;
+import com.project.dao.PaymentDAO;
 import com.project.dao.VehicleDAO;
 import com.project.model.BookingRequest;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.MultipartConfig;
@@ -31,6 +33,7 @@ public class BookingController extends HttpServlet {
 
     private final BookingDAO dao = new BookingDAO();
     private final VehicleDAO vehicleDAO = new VehicleDAO();
+    private final PaymentDAO paymentDAO = new PaymentDAO();
     private static final LocalTime RETURN_WINDOW_END = LocalTime.of(22, 0);
     private static final BigDecimal LATE_FEE_PER_HOUR = new BigDecimal("25.00");
 
@@ -56,7 +59,13 @@ public class BookingController extends HttpServlet {
             int availableSedanCount = vehicleDAO.countAvailableVehiclesByType("SEDAN");
             int availableSuvCount = vehicleDAO.countAvailableVehiclesByType("SUV");
             String defaultVehicleType = availableSedanCount > 0 ? "SEDAN" : (availableSuvCount > 0 ? "SUV" : null);
-            request.setAttribute("bookings", dashboardData.getRecentBookings());
+            List<BookingRequest> recentBookings = dashboardData.getRecentBookings();
+            List<Long> bookingIds = new ArrayList<>();
+            for (BookingRequest booking : recentBookings) {
+                bookingIds.add(booking.getId());
+            }
+            request.setAttribute("bookings", recentBookings);
+            request.setAttribute("paidBookingIds", paymentDAO.getPaidBookingIds(bookingIds));
             request.setAttribute("bookingTotalCount", stats.getTotalRequests());
             request.setAttribute("bookingPendingCount", stats.getPendingRequests());
             request.setAttribute("bookingApprovedCount", stats.getApprovedRequests());
@@ -96,28 +105,27 @@ public class BookingController extends HttpServlet {
         try {
             String tripDateParam = request.getParameter("tripDate");
             String returnDateParam = request.getParameter("returnDate");
+            String bookingPhoneParam = request.getParameter("bookingPhone");
             String vehicleTypeParam = request.getParameter("vehicleType");
             Part licensePart = request.getPart("licenseImage");
 
             if (anyBlank(tripDateParam, returnDateParam, request.getParameter("destination"),
-                    request.getParameter("passengerCount"), vehicleTypeParam, request.getParameter("purpose"))) {
+                    bookingPhoneParam, request.getParameter("passengerCount"), vehicleTypeParam, request.getParameter("purpose"))) {
                 setSessionMessage(request, "All fields are required, including the license photo.", "error");
             } else if (licensePart == null || licensePart.getSize() == 0) {
-                setSessionMessage(request, "Please upload a clear picture of the student matrix card.", "error");
+                setSessionMessage(request, "Please upload a clear picture of the student license card.", "error");
             } else {
                 LocalDate tripDate = LocalDate.parse(tripDateParam);
                 LocalDate returnDate = LocalDate.parse(returnDateParam);
                 LocalTime returnTime = RETURN_WINDOW_END;
 
-                if (returnDate.isBefore(tripDate)) {
+                LocalDate today = LocalDate.now();
+                if (tripDate.isBefore(today)) {
+                    setSessionMessage(request, "Trip date cannot be before today.", "error");
+                } else if (returnDate.isBefore(tripDate)) {
                     setSessionMessage(request, "Return date must be on or after the trip date.", "error");
                 } else {
                     BookingRequest.VehicleType vehicleType = BookingRequest.VehicleType.valueOf(vehicleTypeParam);
-                    if (!hasAvailableVehicle(vehicleType)) {
-                        setSessionMessage(request, "No available vehicle matches the selected type. Please choose another type or try again later.", "error");
-                        response.sendRedirect(request.getContextPath() + "/BookingController");
-                        return;
-                    }
                     int passengerCount = getPassengerPreset(vehicleType);
                     BigDecimal dailyRate = getDailyRate(vehicleType);
                     long rentalDays = calculateRentalDays(tripDate, returnDate);
@@ -125,7 +133,7 @@ public class BookingController extends HttpServlet {
                     String licenseImagePath = saveLicenseImage(request, licensePart, userId);
 
                     if (licenseImagePath == null) {
-                        setSessionMessage(request, "Unable to save the matrix card image. Please try again.", "error");
+                        setSessionMessage(request, "Unable to save the license card image. Please try again.", "error");
                     } else {
                         BookingRequest b = new BookingRequest();
                         b.setUserId(userId);
@@ -133,6 +141,7 @@ public class BookingController extends HttpServlet {
                         b.setReturnDate(returnDate);
                         b.setReturnTime(returnTime);
                         b.setDestination(request.getParameter("destination").trim());
+                        b.setBookerPhone(bookingPhoneParam.trim());
                         b.setPassengerCount(passengerCount);
                         b.setVehicleType(vehicleType);
                         b.setPurpose(request.getParameter("purpose").trim());
@@ -143,11 +152,15 @@ public class BookingController extends HttpServlet {
                         b.setStatus(BookingRequest.Status.PENDING);
                         b.setRequestCode(dao.generateRequestCode());
 
-                        if (dao.addBooking(b)) {
-                            setSessionMessage(request, "Booking " + b.getRequestCode()
-                                    + " submitted! Estimated rental fee: RM " + estimatedFee, "success");
+                        Long bookingId = dao.addBookingWithAutoAssignment(b);
+                        if (bookingId != null) {
+                            setSessionMessage(request,
+                                    "Booking request submitted successfully. You can pay after staff approves it.",
+                                    "success");
+                            response.sendRedirect(request.getContextPath() + "/BookingController");
+                            return;
                         } else {
-                            setSessionMessage(request, "Database error. Please try again.", "error");
+                            setSessionMessage(request, "No available vehicle matches the selected type right now. Please try again later.", "error");
                         }
                     }
                 }
@@ -208,15 +221,13 @@ public class BookingController extends HttpServlet {
                 LocalDate returnDate = LocalDate.parse(returnDateParam);
                 LocalTime returnTime = RETURN_WINDOW_END;
 
-                if (returnDate.isBefore(tripDate)) {
+                LocalDate today = LocalDate.now();
+                if (tripDate.isBefore(today)) {
+                    setSessionMessage(request, "Trip date cannot be before today.", "error");
+                } else if (returnDate.isBefore(tripDate)) {
                     setSessionMessage(request, "Return date must be on or after the trip date.", "error");
                 } else {
                     BookingRequest.VehicleType vehicleType = BookingRequest.VehicleType.valueOf(vehicleTypeParam);
-                    if (!hasAvailableVehicle(vehicleType)) {
-                        setSessionMessage(request, "No available vehicle matches the selected type. Please choose another type or try again later.", "error");
-                        response.sendRedirect(request.getContextPath() + "/BookingController");
-                        return;
-                    }
                     int passengerCount = getPassengerPreset(vehicleType);
                     BigDecimal dailyRate = getDailyRate(vehicleType);
                     long rentalDays = calculateRentalDays(tripDate, returnDate);

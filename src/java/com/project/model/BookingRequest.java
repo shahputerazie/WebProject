@@ -32,6 +32,10 @@ public class BookingRequest {
     private Long assignedVehicleId;
     private Status status;
     private String rejectionReason;
+    private String bookerName;
+    private String bookerEmail;
+    private String bookerPhone;
+    private String bookerRole;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -200,6 +204,38 @@ public class BookingRequest {
 
     public void setRejectionReason(String rejectionReason) {
         this.rejectionReason = rejectionReason;
+    }
+
+    public String getBookerName() {
+        return bookerName;
+    }
+
+    public void setBookerName(String bookerName) {
+        this.bookerName = bookerName;
+    }
+
+    public String getBookerEmail() {
+        return bookerEmail;
+    }
+
+    public void setBookerEmail(String bookerEmail) {
+        this.bookerEmail = bookerEmail;
+    }
+
+    public String getBookerPhone() {
+        return bookerPhone;
+    }
+
+    public void setBookerPhone(String bookerPhone) {
+        this.bookerPhone = bookerPhone;
+    }
+
+    public String getBookerRole() {
+        return bookerRole;
+    }
+
+    public void setBookerRole(String bookerRole) {
+        this.bookerRole = bookerRole;
     }
 
     public LocalDateTime getCreatedAt() {

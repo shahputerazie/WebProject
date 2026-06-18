@@ -5,7 +5,7 @@ import javax.servlet.*;
 import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.*;
 
-@WebFilter(urlPatterns = {"/pages/admin/*", "/pages/user/*", "/pages/staff/*", "/BookingController", "/VehicleController"})
+@WebFilter(urlPatterns = {"/pages/admin/*", "/pages/user/*", "/pages/staff/*", "/BookingController", "/VehicleController", "/PaymentController"})
 public class RoleFilter implements Filter {
 
     @Override
@@ -34,7 +34,7 @@ public class RoleFilter implements Filter {
             allowed = "ADMIN".equals(role) || "STAFF".equals(role);
         } else if (path.startsWith("/pages/staff/") || "/VehicleController".equals(path)) {
             allowed = "ADMIN".equals(role) || "STAFF".equals(role);
-        } else if (path.startsWith("/pages/user/") || "/BookingController".equals(path)) {
+        } else if (path.startsWith("/pages/user/") || "/BookingController".equals(path) || "/PaymentController".equals(path)) {
             allowed = "STUDENT".equals(role) || "LECTURER".equals(role);
         }
 

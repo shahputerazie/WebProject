@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
   PRIMARY KEY (userId),
   UNIQUE KEY uk_users_email (email),
   KEY idx_users_role (role),
-  KEY idx_users_is_active (isActive)
+  KEY idx_users_is_active (isActive),
+  CONSTRAINT chk_users_role CHECK (role IN ('ADMIN', 'STAFF', 'STUDENT', 'LECTURER'))
 );
 
 CREATE TABLE IF NOT EXISTS vehicles (
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   UNIQUE KEY uk_vehicles_license_plate (license_plate),
   KEY idx_vehicles_status (status),
   CONSTRAINT chk_vehicles_capacity CHECK (capacity > 0),
-  CONSTRAINT chk_vehicles_type CHECK (type IN ('SEDAN', 'SUV'))
+  CONSTRAINT chk_vehicles_type CHECK (type IN ('SEDAN', 'SUV')),
+  CONSTRAINT chk_vehicles_status CHECK (status IN ('AVAILABLE', 'UNAVAILABLE', 'MAINTENANCE'))
 );
 
 CREATE TABLE IF NOT EXISTS bookings (
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   return_date DATE NOT NULL,
   return_time TIME NOT NULL DEFAULT '17:00:00',
   destination VARCHAR(255) NOT NULL,
+  booking_phone VARCHAR(30) NOT NULL,
   passenger_count INT NOT NULL,
   vehicle_type ENUM('SEDAN', 'SUV') NOT NULL,
   purpose TEXT NOT NULL,
@@ -92,8 +95,9 @@ CREATE TABLE IF NOT EXISTS payments (
   transaction_reference VARCHAR(50) NOT NULL,
   payer_name VARCHAR(120) NOT NULL,
   payer_email VARCHAR(190) NOT NULL,
+  payer_phone VARCHAR(30) NOT NULL,
   billing_address TEXT DEFAULT NULL,
-  paid_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  paid_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -110,7 +114,11 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (payer_user_id) REFERENCES users(userId)
     ON DELETE RESTRICT
     ON UPDATE CASCADE,
-  CONSTRAINT chk_payments_amount_non_negative CHECK (amount_paid >= 0)
+  CONSTRAINT chk_payments_amount_non_negative CHECK (amount_paid >= 0),
+  CONSTRAINT chk_payments_paid_at_consistency CHECK (
+    (payment_status = 'PAID' AND paid_at IS NOT NULL)
+    OR (payment_status <> 'PAID' AND paid_at IS NULL)
+  )
 );
 
 CREATE TABLE IF NOT EXISTS handover_records (
@@ -137,20 +145,30 @@ CREATE TABLE IF NOT EXISTS handover_records (
 -- Insert reference users first so subsequent seed rows can safely resolve foreign keys.
 INSERT IGNORE INTO users (name, email, passwordHash, role, phone, isActive)
 VALUES
-  ('System Admin', 'admin@umt.edu.my', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'ADMIN', NULL, 1),
-  ('Transport Staff', 'staff@umt.edu.my', '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6', 'STAFF', NULL, 1),
-  ('Default Student', 'student@umt.edu.my', '703b0a3d6ad75b649a28adde7d83c6251da457549263bc7ff45ec709b0a8448b', 'STUDENT', NULL, 1),
-  ('Campus Lecturer', 'lecturer@umt.edu.my', '703b0a3d6ad75b649a28adde7d83c6251da457549263bc7ff45ec709b0a8448b', 'LECTURER', NULL, 1);
+  ('System Admin', 'admin@umt.edu.my', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'ADMIN', '012-1000001', 1),
+  ('Transport Staff', 'staff@umt.edu.my', '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6', 'STAFF', '012-1000002', 1),
+  ('Default Student', 'student@umt.edu.my', '703b0a3d6ad75b649a28adde7d83c6251da457549263bc7ff45ec709b0a8448b', 'STUDENT', '012-1000003', 1),
+  ('Campus Lecturer', 'lecturer@umt.edu.my', '703b0a3d6ad75b649a28adde7d83c6251da457549263bc7ff45ec709b0a8448b', 'LECTURER', '012-1000004', 1);
 
 INSERT IGNORE INTO vehicles (license_plate, type, capacity, status)
 VALUES
   ('TBY1234', 'SEDAN', 4, 'UNAVAILABLE'),
   ('TBY5678', 'SUV', 7, 'AVAILABLE'),
   ('TBY9012', 'SEDAN', 4, 'AVAILABLE'),
-  ('TBY3456', 'SUV', 7, 'AVAILABLE');
+  ('TBY3456', 'SUV', 7, 'AVAILABLE'),
+  ('TBY2468', 'SEDAN', 4, 'AVAILABLE'),
+  ('TBY1357', 'SUV', 7, 'AVAILABLE'),
+  ('TBY8642', 'SEDAN', 4, 'AVAILABLE'),
+  ('TBY9753', 'SUV', 7, 'AVAILABLE'),
+  ('TBY1122', 'SEDAN', 4, 'MAINTENANCE'),
+  ('TBY3344', 'SUV', 7, 'AVAILABLE'),
+  ('TBY5566', 'SEDAN', 4, 'AVAILABLE'),
+  ('TBY7788', 'SUV', 7, 'UNAVAILABLE'),
+  ('TBY9900', 'SEDAN', 4, 'AVAILABLE'),
+  ('TBY2211', 'SUV', 7, 'AVAILABLE');
 
 INSERT IGNORE INTO bookings (
-  request_code, user_id, trip_date, return_date, return_time, destination, passenger_count,
+  request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count,
   vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee,
   assigned_vehicle_id, status
 )
@@ -161,6 +179,7 @@ SELECT
   '2026-06-14',
   '22:00:00',
   'Kuala Terengganu City Center',
+  '012-3456789',
   4,
   'SEDAN',
   'Official student society visit',
@@ -176,7 +195,7 @@ WHERE u.email = 'student@umt.edu.my'
 LIMIT 1;
 
 INSERT IGNORE INTO bookings (
-  request_code, user_id, trip_date, return_date, return_time, destination, passenger_count,
+  request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count,
   vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee,
   assigned_vehicle_id, status
 )
@@ -187,6 +206,7 @@ SELECT
   '2026-06-19',
   '22:00:00',
   'Besut District Office',
+  '012-3456789',
   7,
   'SUV',
   'Faculty trip',
@@ -201,7 +221,7 @@ WHERE u.email = 'student@umt.edu.my'
 LIMIT 1;
 
 INSERT IGNORE INTO bookings (
-  request_code, user_id, trip_date, return_date, return_time, destination, passenger_count,
+  request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count,
   vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee,
   assigned_vehicle_id, status
 )
@@ -212,6 +232,7 @@ SELECT
   '2026-05-02',
   '22:00:00',
   'Dungun Field Visit',
+  '012-3456789',
   4,
   'SEDAN',
   'Completed department fieldwork',
@@ -227,7 +248,7 @@ WHERE u.email = 'student@umt.edu.my'
 LIMIT 1;
 
 INSERT IGNORE INTO bookings (
-  request_code, user_id, trip_date, return_date, return_time, destination, passenger_count,
+  request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count,
   vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee,
   assigned_vehicle_id, status, rejection_reason
 )
@@ -238,6 +259,7 @@ SELECT
   '2026-06-20',
   '18:00:00',
   'Marang District Office',
+  '014-9988776',
   3,
   'SUV',
   'Lecture committee visit',
@@ -253,7 +275,7 @@ WHERE u.email = 'lecturer@umt.edu.my'
 LIMIT 1;
 
 INSERT IGNORE INTO bookings (
-  request_code, user_id, trip_date, return_date, return_time, destination, passenger_count,
+  request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count,
   vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee,
   assigned_vehicle_id, status
 )
@@ -264,6 +286,7 @@ SELECT
   '2026-06-23',
   '20:00:00',
   'Kenyir Lake Research Site',
+  '012-3456789',
   5,
   'SUV',
   'Student research trip',
@@ -293,7 +316,7 @@ LIMIT 1;
 
 INSERT IGNORE INTO payments (
   booking_id, payer_user_id, payment_method, amount_paid, payment_status, transaction_reference,
-  payer_name, payer_email, billing_address, paid_at
+  payer_name, payer_email, payer_phone, billing_address, paid_at
 )
 SELECT
   b.id,
@@ -304,6 +327,7 @@ SELECT
   'TXN-DEMO-0001',
   u.name,
   u.email,
+  u.phone,
   'University Malaysia Terengganu, Kuala Nerus, Terengganu',
   NOW()
 FROM bookings b
@@ -313,7 +337,7 @@ LIMIT 1;
 
 INSERT IGNORE INTO payments (
   booking_id, payer_user_id, payment_method, amount_paid, payment_status, transaction_reference,
-  payer_name, payer_email, billing_address, paid_at
+  payer_name, payer_email, payer_phone, billing_address, paid_at
 )
 SELECT
   b.id,
@@ -324,6 +348,7 @@ SELECT
   'TXN-DEMO-0002',
   u.name,
   u.email,
+  u.phone,
   'University Malaysia Terengganu, Kuala Nerus, Terengganu',
   NOW()
 FROM bookings b
@@ -333,7 +358,7 @@ LIMIT 1;
 
 INSERT IGNORE INTO payments (
   booking_id, payer_user_id, payment_method, amount_paid, payment_status, transaction_reference,
-  payer_name, payer_email, billing_address, paid_at
+  payer_name, payer_email, payer_phone, billing_address, paid_at
 )
 SELECT
   b.id,
@@ -344,6 +369,7 @@ SELECT
   'TXN-DEMO-0003',
   u.name,
   u.email,
+  u.phone,
   'University Malaysia Terengganu, Kuala Nerus, Terengganu',
   NULL
 FROM bookings b

@@ -1,6 +1,7 @@
 package com.project.controller;
 
 import com.project.dao.BookingDAO;
+import com.project.dao.AdminDecisionDAO;
 import com.project.model.BookingRequest;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -14,6 +15,7 @@ import java.util.List;
 public class BookingManagementServlet extends HttpServlet {
 
     private BookingDAO bookingDAO = new BookingDAO();
+    private AdminDecisionDAO adminDecisionDAO = new AdminDecisionDAO();
 
     // GET: Display all bookings for the Staff to review
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -33,7 +35,7 @@ public class BookingManagementServlet extends HttpServlet {
 
         boolean success = false;
         if ("APPROVE".equals(action)) {
-            success = bookingDAO.updateBookingStatus(bookingId, "APPROVED");
+            success = adminDecisionDAO.approveBookingWithVehicle(bookingId, null);
         } else if ("REJECT".equals(action)) {
             String rejectionReason = request.getParameter("rejectionReason");
             if (rejectionReason == null || rejectionReason.trim().isEmpty()) {

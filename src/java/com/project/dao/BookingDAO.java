@@ -19,33 +19,8 @@ public class BookingDAO {
             return false;
         }
 
-        String query = "INSERT INTO bookings (request_code, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
-
-            pstmt.setString(1, booking.getRequestCode());
-            pstmt.setLong(2, booking.getUserId());
-            pstmt.setDate(3, java.sql.Date.valueOf(booking.getTripDate()));
-            pstmt.setDate(4, java.sql.Date.valueOf(booking.getReturnDate()));
-            pstmt.setTime(5, booking.getReturnTime() != null ? Time.valueOf(booking.getReturnTime()) : Time.valueOf("17:00:00"));
-            pstmt.setString(6, booking.getDestination());
-            pstmt.setInt(7, booking.getPassengerCount());
-            pstmt.setString(8, booking.getVehicleType().name());
-            pstmt.setString(9, booking.getPurpose());
-            pstmt.setString(10, booking.getLicenseImagePath());
-            pstmt.setBigDecimal(11, normalizeMoney(booking.getDailyRentalFee()));
-            pstmt.setBigDecimal(12, normalizeMoney(booking.getLateFeePerHour()));
-            pstmt.setBigDecimal(13, normalizeMoney(booking.getEstimatedRentalFee()));
-            if (booking.getAssignedVehicleId() == null) {
-                pstmt.setNull(14, java.sql.Types.BIGINT);
-            } else {
-                pstmt.setLong(14, booking.getAssignedVehicleId());
-            }
-            pstmt.setString(15, booking.getStatus().name());
-            pstmt.setString(16, booking.getRejectionReason());
-
-            isSuccess = pstmt.executeUpdate() > 0;
+        try (Connection conn = DBConnection.getConnection()) {
+            isSuccess = insertBooking(conn, booking) != null;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -53,10 +28,47 @@ public class BookingDAO {
         return isSuccess;
     }
 
+    public Long addBookingWithAutoAssignment(BookingRequest booking) {
+        if (booking == null || booking.getUserId() == null || booking.getUserId() <= 0 || booking.getVehicleType() == null) {
+            return null;
+        }
+
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            Long vehicleId = reserveAvailableVehicle(conn, booking.getVehicleType().name());
+            if (vehicleId == null) {
+                conn.rollback();
+                return null;
+            }
+
+            booking.setAssignedVehicleId(vehicleId);
+
+            Long bookingId = insertBooking(conn, booking);
+            if (bookingId == null) {
+                releaseVehicle(conn, vehicleId);
+                conn.rollback();
+                return null;
+            }
+
+            conn.commit();
+            return bookingId;
+        } catch (Exception e) {
+            e.printStackTrace();
+            rollbackQuietly(conn);
+            return null;
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
     public List<BookingRequest> getAllBookings() {
         List<BookingRequest> bookings = new ArrayList<>();
-        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
-                + "FROM bookings ORDER BY created_at DESC, id DESC";
+        String query = "SELECT b.id, b.user_id, b.trip_date, b.return_date, b.return_time, b.destination, b.booking_phone, b.passenger_count, b.vehicle_type, b.purpose, b.license_image_path, b.daily_rental_fee, b.late_fee_per_hour, b.estimated_rental_fee, b.assigned_vehicle_id, b.status, b.rejection_reason, "
+                + "u.name AS booker_name, u.email AS booker_email, u.phone AS booker_phone, u.role AS booker_role "
+                + "FROM bookings b INNER JOIN users u ON u.userId = b.user_id ORDER BY b.created_at DESC, b.id DESC";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query); ResultSet rs = pstmt.executeQuery()) {
 
@@ -72,7 +84,7 @@ public class BookingDAO {
 
     public List<BookingRequest> getBookingsByUserId(long userId) {
         List<BookingRequest> bookings = new ArrayList<>();
-        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
+        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
                 + "FROM bookings WHERE user_id = ? ORDER BY created_at DESC, id DESC";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
@@ -153,8 +165,9 @@ public class BookingDAO {
 
     public BookingRequest getBookingById(long id) {
         BookingRequest booking = null;
-        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
-                + "FROM bookings WHERE id = ?";
+        String query = "SELECT b.id, b.user_id, b.trip_date, b.return_date, b.return_time, b.destination, b.booking_phone, b.passenger_count, b.vehicle_type, b.purpose, b.license_image_path, b.daily_rental_fee, b.late_fee_per_hour, b.estimated_rental_fee, b.assigned_vehicle_id, b.status, b.rejection_reason, "
+                + "u.name AS booker_name, u.email AS booker_email, u.phone AS booker_phone, u.role AS booker_role "
+                + "FROM bookings b INNER JOIN users u ON u.userId = b.user_id WHERE b.id = ?";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, id);
@@ -173,8 +186,9 @@ public class BookingDAO {
 
     public BookingRequest getBookingByIdAndUserId(long id, long userId) {
         BookingRequest booking = null;
-        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
-                + "FROM bookings WHERE id = ? AND user_id = ?";
+        String query = "SELECT b.id, b.user_id, b.trip_date, b.return_date, b.return_time, b.destination, b.booking_phone, b.passenger_count, b.vehicle_type, b.purpose, b.license_image_path, b.daily_rental_fee, b.late_fee_per_hour, b.estimated_rental_fee, b.assigned_vehicle_id, b.status, b.rejection_reason, "
+                + "u.name AS booker_name, u.email AS booker_email, u.phone AS booker_phone, u.role AS booker_role "
+                + "FROM bookings b INNER JOIN users u ON u.userId = b.user_id WHERE b.id = ? AND b.user_id = ?";
 
         try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, id);
@@ -248,27 +262,86 @@ public class BookingDAO {
 
     public boolean updatePendingBookingForUser(BookingRequest booking, long userId) {
         boolean isSuccess = false;
-        String query = "UPDATE bookings SET trip_date = ?, return_date = ?, return_time = ?, destination = ?, passenger_count = ?, "
-                + "vehicle_type = ?, purpose = ?, daily_rental_fee = ?, late_fee_per_hour = ?, estimated_rental_fee = ?, rejection_reason = NULL, updated_at = NOW() "
+        String selectSql = "SELECT assigned_vehicle_id, vehicle_type FROM bookings WHERE id = ? AND user_id = ? AND status = 'PENDING' FOR UPDATE";
+        String updateSql = "UPDATE bookings SET trip_date = ?, return_date = ?, return_time = ?, destination = ?, passenger_count = ?, "
+                + "vehicle_type = ?, purpose = ?, daily_rental_fee = ?, late_fee_per_hour = ?, estimated_rental_fee = ?, assigned_vehicle_id = ?, rejection_reason = NULL, updated_at = NOW() "
                 + "WHERE id = ? AND user_id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setDate(1, java.sql.Date.valueOf(booking.getTripDate()));
-            pstmt.setDate(2, java.sql.Date.valueOf(booking.getReturnDate()));
-            pstmt.setTime(3, booking.getReturnTime() != null ? Time.valueOf(booking.getReturnTime()) : Time.valueOf("17:00:00"));
-            pstmt.setString(4, booking.getDestination());
-            pstmt.setInt(5, booking.getPassengerCount());
-            pstmt.setString(6, booking.getVehicleType().name());
-            pstmt.setString(7, booking.getPurpose());
-            pstmt.setBigDecimal(8, normalizeMoney(booking.getDailyRentalFee()));
-            pstmt.setBigDecimal(9, normalizeMoney(booking.getLateFeePerHour()));
-            pstmt.setBigDecimal(10, normalizeMoney(booking.getEstimatedRentalFee()));
-            pstmt.setLong(11, booking.getId());
-            pstmt.setLong(12, userId);
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
 
-            isSuccess = pstmt.executeUpdate() > 0;
+            Long currentVehicleId = null;
+            BookingRequest.VehicleType currentVehicleType = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                ps.setLong(1, booking.getId());
+                ps.setLong(2, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        conn.rollback();
+                        return false;
+                    }
+                    long assignedVehicleId = rs.getLong("assigned_vehicle_id");
+                    currentVehicleId = rs.wasNull() ? null : assignedVehicleId;
+                    currentVehicleType = normalizeVehicleType(rs.getString("vehicle_type"));
+                }
+            }
+
+            Long nextVehicleId = currentVehicleId;
+            boolean needsReassignment = currentVehicleId == null
+                    || currentVehicleType == null
+                    || !currentVehicleType.equals(booking.getVehicleType());
+
+            if (needsReassignment) {
+                nextVehicleId = reserveAvailableVehicle(conn, booking.getVehicleType().name());
+                if (nextVehicleId == null) {
+                    conn.rollback();
+                    return false;
+                }
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+                pstmt.setDate(1, java.sql.Date.valueOf(booking.getTripDate()));
+                pstmt.setDate(2, java.sql.Date.valueOf(booking.getReturnDate()));
+                pstmt.setTime(3, booking.getReturnTime() != null ? Time.valueOf(booking.getReturnTime()) : Time.valueOf("17:00:00"));
+                pstmt.setString(4, booking.getDestination());
+                pstmt.setInt(5, booking.getPassengerCount());
+                pstmt.setString(6, booking.getVehicleType().name());
+                pstmt.setString(7, booking.getPurpose());
+                pstmt.setBigDecimal(8, normalizeMoney(booking.getDailyRentalFee()));
+                pstmt.setBigDecimal(9, normalizeMoney(booking.getLateFeePerHour()));
+                pstmt.setBigDecimal(10, normalizeMoney(booking.getEstimatedRentalFee()));
+                if (nextVehicleId == null) {
+                    pstmt.setNull(11, java.sql.Types.BIGINT);
+                } else {
+                    pstmt.setLong(11, nextVehicleId);
+                }
+                pstmt.setLong(12, booking.getId());
+                pstmt.setLong(13, userId);
+
+                isSuccess = pstmt.executeUpdate() > 0;
+            }
+
+            if (!isSuccess) {
+                if (needsReassignment && nextVehicleId != null) {
+                    releaseVehicle(conn, nextVehicleId);
+                }
+                conn.rollback();
+                return false;
+            }
+
+            if (needsReassignment && currentVehicleId != null) {
+                releaseVehicle(conn, currentVehicleId);
+            }
+
+            conn.commit();
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        } finally {
+            closeQuietly(conn);
         }
 
         return isSuccess;
@@ -276,14 +349,47 @@ public class BookingDAO {
 
     public boolean cancelPendingBooking(long bookingId) {
         boolean isSuccess = false;
-        String query = "UPDATE bookings SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'";
+        String selectSql = "SELECT assigned_vehicle_id FROM bookings WHERE id = ? AND status = 'PENDING' FOR UPDATE";
+        String updateSql = "UPDATE bookings SET status = 'CANCELLED', rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setLong(1, bookingId);
-            isSuccess = pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+            Long assignedVehicleId = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                ps.setLong(1, bookingId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        conn.rollback();
+                        return false;
+                    }
+                    long vehicleId = rs.getLong("assigned_vehicle_id");
+                    assignedVehicleId = rs.wasNull() ? null : vehicleId;
+                }
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+                pstmt.setLong(1, bookingId);
+                isSuccess = pstmt.executeUpdate() > 0;
+            }
+
+            if (!isSuccess) {
+                conn.rollback();
+                return false;
+            }
+
+            if (assignedVehicleId != null) {
+                releaseVehicle(conn, assignedVehicleId);
+            }
+
+            conn.commit();
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        } finally {
+            closeQuietly(conn);
         }
 
         return isSuccess;
@@ -291,24 +397,154 @@ public class BookingDAO {
 
     public boolean cancelPendingBookingForUser(long bookingId, long userId) {
         boolean isSuccess = false;
-        String query = "UPDATE bookings SET status = 'CANCELLED' WHERE id = ? AND user_id = ? AND status = 'PENDING'";
+        String selectSql = "SELECT assigned_vehicle_id FROM bookings WHERE id = ? AND user_id = ? AND status = 'PENDING' FOR UPDATE";
+        String updateSql = "UPDATE bookings SET status = 'CANCELLED', rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND user_id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(query)) {
-            pstmt.setLong(1, bookingId);
-            pstmt.setLong(2, userId);
-            isSuccess = pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+            Long assignedVehicleId = null;
+
+            try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                ps.setLong(1, bookingId);
+                ps.setLong(2, userId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        conn.rollback();
+                        return false;
+                    }
+                    long vehicleId = rs.getLong("assigned_vehicle_id");
+                    assignedVehicleId = rs.wasNull() ? null : vehicleId;
+                }
+            }
+
+            try (PreparedStatement pstmt = conn.prepareStatement(updateSql)) {
+                pstmt.setLong(1, bookingId);
+                pstmt.setLong(2, userId);
+                isSuccess = pstmt.executeUpdate() > 0;
+            }
+
+            if (!isSuccess) {
+                conn.rollback();
+                return false;
+            }
+
+            if (assignedVehicleId != null) {
+                releaseVehicle(conn, assignedVehicleId);
+            }
+
+            conn.commit();
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        } finally {
+            closeQuietly(conn);
         }
 
         return isSuccess;
     }
 
+    private Long insertBooking(Connection conn, BookingRequest booking) throws Exception {
+        String query = "INSERT INTO bookings (request_code, user_id, trip_date, return_date, return_time, destination, booking_phone, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query, PreparedStatement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, booking.getRequestCode());
+            pstmt.setLong(2, booking.getUserId());
+            pstmt.setDate(3, java.sql.Date.valueOf(booking.getTripDate()));
+            pstmt.setDate(4, java.sql.Date.valueOf(booking.getReturnDate()));
+            pstmt.setTime(5, booking.getReturnTime() != null ? Time.valueOf(booking.getReturnTime()) : Time.valueOf("17:00:00"));
+            pstmt.setString(6, booking.getDestination());
+            pstmt.setString(7, booking.getBookerPhone());
+            pstmt.setInt(8, booking.getPassengerCount());
+            pstmt.setString(9, booking.getVehicleType().name());
+            pstmt.setString(10, booking.getPurpose());
+            pstmt.setString(11, booking.getLicenseImagePath());
+            pstmt.setBigDecimal(12, normalizeMoney(booking.getDailyRentalFee()));
+            pstmt.setBigDecimal(13, normalizeMoney(booking.getLateFeePerHour()));
+            pstmt.setBigDecimal(14, normalizeMoney(booking.getEstimatedRentalFee()));
+            if (booking.getAssignedVehicleId() == null) {
+                pstmt.setNull(15, java.sql.Types.BIGINT);
+            } else {
+                pstmt.setLong(15, booking.getAssignedVehicleId());
+            }
+            pstmt.setString(16, booking.getStatus().name());
+            pstmt.setString(17, booking.getRejectionReason());
+
+            if (pstmt.executeUpdate() <= 0) {
+                return null;
+            }
+
+            try (ResultSet keys = pstmt.getGeneratedKeys()) {
+                if (keys.next()) {
+                    return keys.getLong(1);
+                }
+            }
+            return null;
+        }
+    }
+
+    private Long reserveAvailableVehicle(Connection conn, String type) throws Exception {
+        String selectSql = "SELECT id FROM vehicles WHERE status = 'AVAILABLE' AND type = ? ORDER BY id ASC LIMIT 1 FOR UPDATE";
+        String updateSql = "UPDATE vehicles SET status = 'UNAVAILABLE', updated_at = NOW() WHERE id = ?";
+
+        try (PreparedStatement select = conn.prepareStatement(selectSql)) {
+            select.setString(1, type);
+            try (ResultSet rs = select.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                long vehicleId = rs.getLong("id");
+                try (PreparedStatement update = conn.prepareStatement(updateSql)) {
+                    update.setLong(1, vehicleId);
+                    if (update.executeUpdate() <= 0) {
+                        return null;
+                    }
+                }
+                return vehicleId;
+            }
+        }
+    }
+
+    private void releaseVehicle(Connection conn, Long vehicleId) throws Exception {
+        if (vehicleId == null) {
+            return;
+        }
+
+        String releaseSql = "UPDATE vehicles SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(releaseSql)) {
+            ps.setLong(1, vehicleId);
+            ps.executeUpdate();
+        }
+    }
+
+    private void rollbackQuietly(Connection conn) {
+        if (conn == null) {
+            return;
+        }
+        try {
+            conn.rollback();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void closeQuietly(Connection conn) {
+        if (conn == null) {
+            return;
+        }
+        try {
+            conn.close();
+        } catch (Exception ignored) {
+        }
+    }
+
     private List<BookingRequest> collectRecentBookings(Connection conn, long userId, int limit) throws Exception {
         List<BookingRequest> bookings = new ArrayList<>();
-        String query = "SELECT id, user_id, trip_date, return_date, return_time, destination, passenger_count, vehicle_type, purpose, license_image_path, daily_rental_fee, late_fee_per_hour, estimated_rental_fee, assigned_vehicle_id, status, rejection_reason "
-                + "FROM bookings WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ?";
+        String query = "SELECT b.id, b.user_id, b.trip_date, b.return_date, b.return_time, b.destination, b.booking_phone, b.passenger_count, b.vehicle_type, b.purpose, b.license_image_path, b.daily_rental_fee, b.late_fee_per_hour, b.estimated_rental_fee, b.assigned_vehicle_id, b.status, b.rejection_reason, "
+                + "u.name AS booker_name, u.email AS booker_email, u.phone AS booker_phone, u.role AS booker_role "
+                + "FROM bookings b INNER JOIN users u ON u.userId = b.user_id WHERE b.user_id = ? ORDER BY b.created_at DESC, b.id DESC LIMIT ?";
 
         try (PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setLong(1, userId);
@@ -343,6 +579,11 @@ public class BookingDAO {
         }
 
         booking.setDestination(rs.getString("destination"));
+        String bookingPhone = getStringIfPresent(rs, "booking_phone");
+        if (bookingPhone == null || bookingPhone.trim().isEmpty()) {
+            bookingPhone = getStringIfPresent(rs, "booker_phone");
+        }
+        booking.setBookerPhone(bookingPhone);
         booking.setPassengerCount(rs.getInt("passenger_count"));
 
         String vehicleType = rs.getString("vehicle_type");
@@ -368,8 +609,19 @@ public class BookingDAO {
         }
 
         booking.setRejectionReason(rs.getString("rejection_reason"));
+        booking.setBookerName(getStringIfPresent(rs, "booker_name"));
+        booking.setBookerEmail(getStringIfPresent(rs, "booker_email"));
+        booking.setBookerRole(getStringIfPresent(rs, "booker_role"));
 
         return booking;
+    }
+
+    private String getStringIfPresent(ResultSet rs, String column) {
+        try {
+            return rs.getString(column);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private BigDecimal normalizeMoney(BigDecimal value) {
