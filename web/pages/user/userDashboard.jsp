@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.List,com.project.dao.BookingDAO,com.project.dao.VehicleDAO,com.project.model.BookingRequest,com.project.model.Vehicle" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="java.util.List,java.util.Set,com.project.dao.BookingDAO,com.project.dao.PaymentDAO,com.project.dao.VehicleDAO,com.project.model.BookingRequest,com.project.model.Vehicle" %>
 <%!
     private String esc(String value) {
         if (value == null) {
@@ -9,6 +9,43 @@
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#x27;");
+    }
+
+    private String formatDate(BookingRequest booking, boolean isReturn) {
+        if (booking == null) {
+            return "-";
+        }
+        java.time.LocalDate date = isReturn ? booking.getReturnDate() : booking.getTripDate();
+        return date == null ? "-" : date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
+
+    private String safeRequestCode(BookingRequest booking) {
+        return booking != null && booking.getRequestCode() != null && !booking.getRequestCode().trim().isEmpty()
+                ? booking.getRequestCode()
+                : "BK-" + (booking == null ? "" : booking.getId());
+    }
+
+    private String statusLabel(BookingRequest booking) {
+        if (booking == null || booking.getStatus() == null) {
+            return "UNKNOWN";
+        }
+        return booking.getStatus().name();
+    }
+
+    private String statusBadgeClass(String status) {
+        if ("PENDING".equals(status)) {
+            return "bg-amber-100 text-amber-800";
+        }
+        if ("APPROVED".equals(status)) {
+            return "bg-primary-container text-primary-fixed-dim";
+        }
+        if ("COMPLETED".equals(status)) {
+            return "bg-emerald-100 text-emerald-800";
+        }
+        if ("REJECTED".equals(status) || "CANCELLED".equals(status)) {
+            return "bg-error-container text-on-error-container";
+        }
+        return "bg-surface-container-high text-on-surface";
     }
 %>
 <%
@@ -28,10 +65,16 @@
 
     BookingDAO bookingDAO = new BookingDAO();
     VehicleDAO vehicleDAO = new VehicleDAO();
+    PaymentDAO paymentDAO = new PaymentDAO();
     List<BookingRequest> bookings = currentUserId == null
             ? bookingDAO.getAllBookings()
             : bookingDAO.getBookingsByUserId(currentUserId);
     List<Vehicle> vehicles = vehicleDAO.getAllVehicles();
+    List<Long> bookingIds = new java.util.ArrayList<>();
+    for (BookingRequest b : bookings) {
+        bookingIds.add(b.getId());
+    }
+    Set<Long> paidBookingIds = paymentDAO.getPaidBookingIds(bookingIds);
     int totalRequests = bookings.size();
     int pendingRequests = 0;
     int approvedRequests = 0;
@@ -112,49 +155,74 @@
 
                 <section class="bg-surface-container-lowest rounded-2xl border border-outline-variant/10 overflow-hidden">
                     <div class="px-6 py-5 border-b border-outline-variant/10">
-                        <h2 class="font-headline font-bold text-xl">Recent Booking Activity</h2>
+                        <h2 class="font-headline font-bold text-xl">My Booking History</h2>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full border-collapse" data-sortable-table="true">
                             <thead>
                                 <tr class="bg-surface-container-high/50 text-left">
                                     <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Request ID</th>
-                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Requester</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="date">Trip</th>
                                     <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Destination</th>
                                     <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant" data-sortable-type="text">Status</th>
+                                    <th class="px-6 py-4 text-xs uppercase tracking-widest text-on-surface-variant">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-surface">
                                 <% if (bookings.isEmpty()) { %>
                                 <tr>
-                                    <td colspan="4" class="px-6 py-6 text-center text-sm text-on-surface-variant">No booking activity found.</td>
+                                    <td colspan="5" class="px-6 py-6 text-center text-sm text-on-surface-variant">No booking activity found.</td>
                                 </tr>
                                 <% } else {
                                     int maxRows = Math.min(bookings.size(), 5);
                                     for (int i = 0; i < maxRows; i++) {
                                         BookingRequest booking = bookings.get(i);
-                                        String statusLabel = booking.getStatus() == null ? "Unknown" : booking.getStatus().name();
-                                        String displayStatus = statusLabel.substring(0, 1) + statusLabel.substring(1).toLowerCase();
-                                        String badgeClass = "bg-surface-container-high text-on-surface";
-                                        if ("PENDING".equals(statusLabel)) {
-                                            badgeClass = "bg-amber-100 text-amber-800";
-                                        } else if ("APPROVED".equals(statusLabel)) {
-                                            badgeClass = "bg-primary-container text-primary-fixed-dim";
-                                        } else if ("CANCELLED".equals(statusLabel) || "REJECTED".equals(statusLabel)) {
-                                            badgeClass = "bg-error-container text-on-error-container";
-                                        }
-                                        String requestId = booking.getRequestCode() != null && !booking.getRequestCode().trim().isEmpty()
-                                                ? booking.getRequestCode()
-                                                : "BK-" + booking.getId();
-                                        String requester = currentUserId == null
-                                                ? "User #" + booking.getUserId()
-                                                : "You";
+                                        boolean isPaid = paidBookingIds.contains(booking.getId());
+                                        String status = statusLabel(booking);
+                                        String displayStatus = isPaid && booking.getStatus() == BookingRequest.Status.APPROVED ? "PAID" : status;
+                                        String requestId = safeRequestCode(booking);
+                                        String badgeClass = isPaid && booking.getStatus() == BookingRequest.Status.APPROVED
+                                                ? "bg-emerald-100 text-emerald-800"
+                                                : statusBadgeClass(status);
+                                        boolean canPay = booking.getStatus() == BookingRequest.Status.APPROVED && !isPaid;
+                                        boolean canCancel = booking.getStatus() == BookingRequest.Status.PENDING;
                                 %>
                                 <tr>
                                     <td class="px-6 py-4 font-semibold text-primary"><%= esc(requestId) %></td>
-                                    <td class="px-6 py-4 text-sm"><%= esc(requester) %></td>
+                                    <td class="px-6 py-4 text-sm" data-sort-value="<%= booking.getTripDate() == null ? "" : booking.getTripDate() %>">
+                                        <%= esc(formatDate(booking, false)) %> to <%= esc(formatDate(booking, true)) %>
+                                    </td>
                                     <td class="px-6 py-4 text-sm"><%= esc(booking.getDestination()) %></td>
-                                    <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-bold <%= badgeClass %>"><%= esc(displayStatus) %></span></td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold <%= badgeClass %>"><%= esc(displayStatus) %></span>
+                                        <% if ("REJECTED".equals(status) && booking.getRejectionReason() != null && !booking.getRejectionReason().trim().isEmpty()) { %>
+                                        <div class="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] leading-5 text-red-800">
+                                            <span class="font-bold uppercase tracking-wide">Reason:</span>
+                                            <span><%= esc(booking.getRejectionReason()) %></span>
+                                        </div>
+                                        <% } %>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-wrap gap-2">
+                                            <a href="${pageContext.request.contextPath}/BookingController?action=detail&id=<%= booking.getId() %>" class="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-outline-variant/30 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors">
+                                                View
+                                            </a>
+                                            <% if (canPay) { %>
+                                            <a href="${pageContext.request.contextPath}/PaymentController?id=<%= booking.getId() %>" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                                                Make Payment
+                                            </a>
+                                            <% } %>
+                                            <% if (canCancel) { %>
+                                            <form action="${pageContext.request.contextPath}/BookingController" method="POST" onsubmit="return confirm('Cancel this booking request?');">
+                                                <input type="hidden" name="action" value="cancel"/>
+                                                <input type="hidden" name="id" value="<%= booking.getId() %>"/>
+                                                <button type="submit" class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-error text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                                                    Cancel
+                                                </button>
+                                            </form>
+                                            <% } %>
+                                        </div>
+                                    </td>
                                 </tr>
                                 <%      }
                                    } %>

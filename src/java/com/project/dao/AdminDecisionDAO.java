@@ -21,7 +21,9 @@ public class AdminDecisionDAO {
         String releaseSql = "UPDATE vehicles SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?";
         String normalizedReason = (rejectionReason == null || rejectionReason.trim().isEmpty()) ? null : rejectionReason.trim();
 
-        try (Connection conn = DBConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
             conn.setAutoCommit(false);
             Long assignedVehicleId = null;
 
@@ -66,21 +68,27 @@ public class AdminDecisionDAO {
 
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        }
+        finally {
+            closeQuietly(conn);
         }
         return false;
     }
 
     public boolean approveBookingWithVehicle(Long bookingId, Long vehicleId) {
-        String bookingSql = "SELECT vehicle_type, status FROM bookings WHERE id = ? FOR UPDATE";
+        String bookingSql = "SELECT vehicle_type, status, assigned_vehicle_id FROM bookings WHERE id = ? FOR UPDATE";
         String vehicleSql = "SELECT type, status FROM vehicles WHERE id = ? FOR UPDATE";
-        String updateBookingSql = "UPDATE bookings SET status = 'APPROVED', assigned_vehicle_id = ?, rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND status = 'PENDING'";
-        String updateVehicleSql = "UPDATE vehicles SET status = 'UNAVAILABLE', updated_at = NOW() WHERE id = ?";
+        String updateBookingSql = "UPDATE bookings SET status = 'APPROVED', rejection_reason = NULL, updated_at = NOW() WHERE id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
             conn.setAutoCommit(false);
 
             String bookingType = null;
             String bookingStatus = null;
+            Long assignedVehicleId = null;
             String vehicleType = null;
             String vehicleStatus = null;
 
@@ -90,6 +98,8 @@ public class AdminDecisionDAO {
                     if (rs.next()) {
                         bookingType = rs.getString("vehicle_type");
                         bookingStatus = rs.getString("status");
+                        long currentVehicleId = rs.getLong("assigned_vehicle_id");
+                        assignedVehicleId = rs.wasNull() ? null : currentVehicleId;
                     } else {
                         conn.rollback();
                         return false;
@@ -102,8 +112,19 @@ public class AdminDecisionDAO {
                 return false;
             }
 
+            Long targetVehicleId = vehicleId != null ? vehicleId : assignedVehicleId;
+            if (targetVehicleId == null) {
+                conn.rollback();
+                return false;
+            }
+
+            if (assignedVehicleId != null && !assignedVehicleId.equals(targetVehicleId)) {
+                conn.rollback();
+                return false;
+            }
+
             try (PreparedStatement ps = conn.prepareStatement(vehicleSql)) {
-                ps.setLong(1, vehicleId);
+                ps.setLong(1, targetVehicleId);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         vehicleType = rs.getString("type");
@@ -118,26 +139,21 @@ public class AdminDecisionDAO {
             String bookingCategory = normalizeVehicleCategory(bookingType);
             String vehicleCategory = normalizeVehicleCategory(vehicleType);
 
-            if (!"AVAILABLE".equalsIgnoreCase(vehicleStatus)
-                    || bookingCategory == null
+            if (bookingCategory == null
                     || vehicleCategory == null
-                    || !vehicleCategory.equals(bookingCategory)) {
+                    || !vehicleCategory.equals(bookingCategory)
+                    || (!"AVAILABLE".equalsIgnoreCase(vehicleStatus)
+                        && !"UNAVAILABLE".equalsIgnoreCase(vehicleStatus))) {
                 conn.rollback();
                 return false;
             }
 
             try (PreparedStatement ps = conn.prepareStatement(updateBookingSql)) {
-                ps.setLong(1, vehicleId);
-                ps.setLong(2, bookingId);
+                ps.setLong(1, bookingId);
                 if (ps.executeUpdate() <= 0) {
                     conn.rollback();
                     return false;
                 }
-            }
-
-            try (PreparedStatement ps = conn.prepareStatement(updateVehicleSql)) {
-                ps.setLong(1, vehicleId);
-                ps.executeUpdate();
             }
 
             conn.commit();
@@ -145,6 +161,9 @@ public class AdminDecisionDAO {
 
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        } finally {
+            closeQuietly(conn);
         }
         return false;
     }
@@ -156,7 +175,9 @@ public class AdminDecisionDAO {
         String deleteHandoverSql = "DELETE FROM handover_records WHERE booking_id = ?";
         String releaseSql = "UPDATE vehicles SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?";
         
-        try (Connection conn = DBConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
             conn.setAutoCommit(false);
             Long assignedVehicleId = null;
 
@@ -196,6 +217,9 @@ public class AdminDecisionDAO {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            rollbackQuietly(conn);
+        } finally {
+            closeQuietly(conn);
         }
         return false;
     }
@@ -256,5 +280,25 @@ public class AdminDecisionDAO {
             return "SUV";
         }
         return null;
+    }
+
+    private void rollbackQuietly(Connection conn) {
+        if (conn == null) {
+            return;
+        }
+        try {
+            conn.rollback();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void closeQuietly(Connection conn) {
+        if (conn == null) {
+            return;
+        }
+        try {
+            conn.close();
+        } catch (Exception ignored) {
+        }
     }
 }

@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="com.project.model.BookingRequest,com.project.dao.BookingDAO,java.time.format.DateTimeFormatter" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="com.project.model.BookingRequest,com.project.model.Payment,com.project.dao.BookingDAO,com.project.dao.PaymentDAO,java.time.format.DateTimeFormatter" %>
 <%@ page import="java.math.BigDecimal" %>
 <%!
     private String esc(String value) {
@@ -61,30 +61,40 @@
         return;
     }
 
+    BookingDAO bookingDAO = new BookingDAO();
+    PaymentDAO paymentDAO = new PaymentDAO();
     BookingRequest booking = currentUserId == null
             ? null
-            : new BookingDAO().getBookingByIdAndUserId(bookingId, currentUserId);
+            : bookingDAO.getBookingByIdAndUserId(bookingId, currentUserId);
     if (booking == null) {
         response.sendRedirect(request.getContextPath() + "/BookingController");
         return;
     }
 
+    Payment payment = paymentDAO.getPaymentByBookingId(bookingId);
     boolean paymentEligible = booking.getStatus() == BookingRequest.Status.APPROVED;
+    boolean alreadyPaid = payment != null && "PAID".equalsIgnoreCase(payment.getPaymentStatus());
     boolean submitted = "POST".equalsIgnoreCase(request.getMethod());
 
     String paymentMethod = request.getParameter("paymentMethod");
     String payerName = request.getParameter("payerName");
     String payerEmail = request.getParameter("payerEmail");
+    String payerPhone = request.getParameter("payerPhone");
     String cardNumber = request.getParameter("cardNumber");
     String cardExpiry = request.getParameter("cardExpiry");
     String cardCvv = request.getParameter("cardCvv");
     String billingAddress = request.getParameter("billingAddress");
+
+    if ((payerPhone == null || payerPhone.trim().isEmpty()) && booking.getBookerPhone() != null) {
+        payerPhone = booking.getBookerPhone();
+    }
 
     boolean hasErrors = submitted && (
             !paymentEligible ||
             blank(paymentMethod) ||
             blank(payerName) ||
             blank(payerEmail) ||
+            blank(payerPhone) ||
             blank(cardNumber) ||
             blank(cardExpiry) ||
             blank(cardCvv));
@@ -92,14 +102,21 @@
     String successMessage = null;
     String errorMessage = null;
     String receiptReference = null;
-    if (submitted) {
+    String statusParam = request.getParameter("status");
+    String messageParam = request.getParameter("message");
+    if (statusParam != null) {
+        if ("success".equalsIgnoreCase(statusParam)) {
+            successMessage = messageParam != null ? messageParam : "Payment submitted successfully.";
+        } else if ("exists".equalsIgnoreCase(statusParam)) {
+            successMessage = messageParam != null ? messageParam : "Payment has already been completed.";
+        } else if ("error".equalsIgnoreCase(statusParam)) {
+            errorMessage = messageParam != null ? messageParam : "Payment could not be processed.";
+        }
+    } else if (submitted) {
         if (!paymentEligible) {
             errorMessage = "Payment is only available after the request is approved.";
         } else if (hasErrors) {
             errorMessage = "Please complete all required payment fields.";
-        } else {
-            receiptReference = "PMT-" + booking.getId() + "-" + System.currentTimeMillis();
-            successMessage = "Payment submitted successfully. Receipt reference: " + receiptReference + ".";
         }
     }
 
@@ -179,9 +196,16 @@
                                 Payment is only available for approved bookings. This request is currently
                                 <span class="font-semibold"><%= esc(statusDisplay) %></span>.
                             </div>
+                            <% } else if (alreadyPaid) { %>
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                                This booking has already been paid.
+                                <% if (payment != null && payment.getTransactionReference() != null) { %>
+                                Receipt reference: <span class="font-semibold"><%= esc(payment.getTransactionReference()) %></span>.
+                                <% } %>
+                            </div>
                             <% } %>
 
-                            <form action="${pageContext.request.contextPath}/pages/user/payment.jsp?id=<%= booking.getId() %>" method="POST" class="space-y-5">
+                            <form action="${pageContext.request.contextPath}/PaymentController?id=<%= booking.getId() %>" method="POST" class="space-y-5">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="rounded-2xl border border-outline-variant/10 bg-surface-container-low p-4">
                                         <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Booking ID</p>
@@ -197,21 +221,21 @@
                                     <p class="text-sm font-semibold text-on-surface">Payment Method</p>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
                                         <label class="flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-white p-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                                            <input type="radio" name="paymentMethod" value="CARD" <%= submitted && "CARD".equals(paymentMethod) ? "checked" : (!submitted ? "checked" : "") %> class="mt-1 text-primary focus:ring-primary" <%= paymentEligible ? "" : "disabled" %>/>
+                                            <input type="radio" name="paymentMethod" value="CARD" <%= submitted && "CARD".equals(paymentMethod) ? "checked" : (!submitted ? "checked" : "") %> class="mt-1 text-primary focus:ring-primary"/>
                                             <span>
                                                 <span class="block font-semibold text-on-surface">Card</span>
                                                 <span class="block text-sm text-on-surface-variant mt-1">Visa or MasterCard</span>
                                             </span>
                                         </label>
                                         <label class="flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-white p-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                                            <input type="radio" name="paymentMethod" value="ONLINE_BANKING" <%= "ONLINE_BANKING".equals(paymentMethod) ? "checked" : "" %> class="mt-1 text-primary focus:ring-primary" <%= paymentEligible ? "" : "disabled" %>/>
+                                            <input type="radio" name="paymentMethod" value="ONLINE_BANKING" <%= "ONLINE_BANKING".equals(paymentMethod) ? "checked" : "" %> class="mt-1 text-primary focus:ring-primary"/>
                                             <span>
                                                 <span class="block font-semibold text-on-surface">Online Banking</span>
                                                 <span class="block text-sm text-on-surface-variant mt-1">FPX / bank transfer</span>
                                             </span>
                                         </label>
                                         <label class="flex items-start gap-3 rounded-2xl border border-outline-variant/20 bg-white p-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                                            <input type="radio" name="paymentMethod" value="EWALLET" <%= "EWALLET".equals(paymentMethod) ? "checked" : "" %> class="mt-1 text-primary focus:ring-primary" <%= paymentEligible ? "" : "disabled" %>/>
+                                            <input type="radio" name="paymentMethod" value="EWALLET" <%= "EWALLET".equals(paymentMethod) ? "checked" : "" %> class="mt-1 text-primary focus:ring-primary"/>
                                             <span>
                                                 <span class="block font-semibold text-on-surface">E-Wallet</span>
                                                 <span class="block text-sm text-on-surface-variant mt-1">Touch 'n Go, Boost, or similar</span>
@@ -223,34 +247,39 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label class="block">
                                         <span class="text-sm font-semibold text-on-surface-variant">Payer Name</span>
-                                        <input type="text" name="payerName" value="<%= esc(payerName) %>" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>/>
+                                        <input type="text" name="payerName" value="<%= esc(payerName) %>" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
                                     </label>
                                     <label class="block">
                                         <span class="text-sm font-semibold text-on-surface-variant">Payer Email</span>
-                                        <input type="email" name="payerEmail" value="<%= esc(payerEmail) %>" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>/>
+                                        <input type="email" name="payerEmail" value="<%= esc(payerEmail) %>" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
                                     </label>
                                 </div>
+
+                                <label class="block">
+                                    <span class="text-sm font-semibold text-on-surface-variant">Payer Phone Number</span>
+                                    <input type="tel" name="payerPhone" value="<%= esc(payerPhone) %>" placeholder="012-3456789" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
+                                </label>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label class="block">
                                         <span class="text-sm font-semibold text-on-surface-variant">Card Number</span>
-                                        <input type="text" name="cardNumber" value="<%= esc(cardNumber) %>" placeholder="1234 5678 9012 3456" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>/>
+                                        <input type="text" name="cardNumber" value="<%= esc(cardNumber) %>" placeholder="1234 5678 9012 3456" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
                                     </label>
                                     <div class="grid grid-cols-2 gap-4">
                                         <label class="block">
                                             <span class="text-sm font-semibold text-on-surface-variant">Expiry</span>
-                                            <input type="text" name="cardExpiry" value="<%= esc(cardExpiry) %>" placeholder="MM/YY" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>/>
+                                            <input type="text" name="cardExpiry" value="<%= esc(cardExpiry) %>" placeholder="MM/YY" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
                                         </label>
                                         <label class="block">
                                             <span class="text-sm font-semibold text-on-surface-variant">CVV</span>
-                                            <input type="password" name="cardCvv" value="<%= esc(cardCvv) %>" placeholder="123" maxlength="4" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>/>
+                                            <input type="password" name="cardCvv" value="<%= esc(cardCvv) %>" placeholder="123" maxlength="4" required class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"/>
                                         </label>
                                     </div>
                                 </div>
 
                                 <label class="block">
                                     <span class="text-sm font-semibold text-on-surface-variant">Billing Address</span>
-                                    <textarea name="billingAddress" rows="4" placeholder="Optional billing address" class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint <%= paymentEligible ? "" : "opacity-70" %>" <%= paymentEligible ? "" : "disabled" %>><%= esc(billingAddress) %></textarea>
+                                    <textarea name="billingAddress" rows="4" placeholder="Optional billing address" class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"><%= esc(billingAddress) %></textarea>
                                 </label>
 
                                 <div class="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-3 pt-2">
@@ -262,13 +291,13 @@
                                         <a href="${pageContext.request.contextPath}/BookingController?action=detail&id=<%= booking.getId() %>" class="px-5 py-3 rounded-xl border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors text-center">
                                             Cancel
                                         </a>
-                                        <% if (paymentEligible) { %>
-                                        <button type="submit" class="px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-surface-tint text-white font-semibold shadow-sm">
+                                        <% if (!alreadyPaid) { %>
+                                        <button type="submit" class="px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-surface-tint text-white font-semibold shadow-sm hover:opacity-90 transition-opacity">
                                             Submit Payment
                                         </button>
                                         <% } else { %>
                                         <button type="button" disabled class="px-5 py-3 rounded-xl bg-surface-container-high text-on-surface-variant font-semibold opacity-70 cursor-not-allowed">
-                                            Payment Unavailable
+                                            Payment Completed
                                         </button>
                                         <% } %>
                                     </div>

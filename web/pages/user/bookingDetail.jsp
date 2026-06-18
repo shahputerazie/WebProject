@@ -1,5 +1,5 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" import="com.project.model.BookingRequest" %>
-<%@ page import="com.project.model.Vehicle, com.project.dao.VehicleDAO" %>
+<%@ page import="com.project.model.Vehicle, com.project.dao.VehicleDAO, com.project.dao.PaymentDAO, com.project.model.Payment" %>
 <%!
     private String esc(String value) {
         if (value == null) {
@@ -20,7 +20,9 @@
     }
 
     boolean canModify = Boolean.TRUE.equals(request.getAttribute("canModify"));
-    boolean canPay = booking.getStatus() == BookingRequest.Status.APPROVED;
+    Payment payment = new PaymentDAO().getPaymentByBookingId(booking.getId());
+    boolean isPaid = payment != null && "PAID".equalsIgnoreCase(payment.getPaymentStatus());
+    boolean canPay = booking.getStatus() == BookingRequest.Status.APPROVED && !isPaid;
     String lockAttr = canModify ? "" : "disabled";
     String statusLabel = booking.getStatus() == null ? "Unknown" : booking.getStatus().name();
     String displayStatus = statusLabel.substring(0, 1) + statusLabel.substring(1).toLowerCase();
@@ -137,11 +139,11 @@
 
                         <label class="block">
                             <span class="text-sm text-on-surface-variant font-medium">Trip Date</span>
-                            <input type="date" name="tripDate" value="<%= booking.getTripDate() == null ? "" : booking.getTripDate() %>" required class="mt-1 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm focus:ring-1 focus:ring-surface-tint disabled:opacity-70" <%= lockAttr %>/>
+                            <input type="date" name="tripDate" min="<%= java.time.LocalDate.now().toString() %>" value="<%= booking.getTripDate() == null ? "" : booking.getTripDate() %>" required class="mt-1 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm focus:ring-1 focus:ring-surface-tint disabled:opacity-70" <%= lockAttr %>/>
                         </label>
                         <label class="block">
                             <span class="text-sm text-on-surface-variant font-medium">Return Date</span>
-                            <input type="date" name="returnDate" value="<%= booking.getReturnDate() == null ? "" : booking.getReturnDate() %>" required class="mt-1 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm focus:ring-1 focus:ring-surface-tint disabled:opacity-70" <%= lockAttr %>/>
+                            <input type="date" name="returnDate" min="<%= java.time.LocalDate.now().toString() %>" value="<%= booking.getReturnDate() == null ? "" : booking.getReturnDate() %>" required class="mt-1 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm focus:ring-1 focus:ring-surface-tint disabled:opacity-70" <%= lockAttr %>/>
                         </label>
                         <label class="block md:col-span-2">
                             <span class="text-sm text-on-surface-variant font-medium">Destination</span>
@@ -164,20 +166,24 @@
                         </label>
 
                     <div class="md:col-span-2 rounded-xl border border-outline-variant/10 bg-surface-container-low p-4">
-                            <p class="text-sm font-semibold text-on-surface-variant mb-2">Student Matrix Card</p>
+                            <p class="text-sm font-semibold text-on-surface-variant mb-2">Student License Card</p>
                             <% if (booking.getLicenseImagePath() != null && !booking.getLicenseImagePath().trim().isEmpty()) { %>
-                                <img src="${pageContext.request.contextPath}<%= esc(booking.getLicenseImagePath()) %>" alt="Student matrix card" class="max-h-64 rounded-xl border border-outline-variant/20 object-contain bg-white"/>
+                                <img src="${pageContext.request.contextPath}<%= esc(booking.getLicenseImagePath()) %>" alt="Student license card" class="max-h-64 rounded-xl border border-outline-variant/20 object-contain bg-white"/>
                             <% } else { %>
-                                <p class="text-sm text-on-surface-variant">No matrix card image uploaded for this request.</p>
+                                <p class="text-sm text-on-surface-variant">No license card image uploaded for this request.</p>
                             <% } %>
                         </div>
 
                         <div class="md:col-span-2 flex justify-end gap-3 pt-1">
                             <a href="${pageContext.request.contextPath}/BookingController" class="px-5 py-2.5 rounded-md border border-outline-variant/30 text-on-surface-variant font-semibold hover:bg-surface-container-high transition-colors">Back to List</a>
                             <% if (canPay) { %>
-                            <a href="${pageContext.request.contextPath}/pages/user/payment.jsp?id=<%= booking.getId() %>" class="px-5 py-2.5 rounded-md bg-primary text-white font-semibold hover:opacity-90">
+                            <a href="${pageContext.request.contextPath}/PaymentController?id=<%= booking.getId() %>" class="px-5 py-2.5 rounded-md bg-primary text-white font-semibold hover:opacity-90">
                                 Make Payment
                             </a>
+                            <% } else if (isPaid) { %>
+                            <span class="px-5 py-2.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">
+                                Payment Completed
+                            </span>
                             <% } %>
                             <% if (canModify) { %>
                             <button type="submit" name="action" value="cancel" formnovalidate

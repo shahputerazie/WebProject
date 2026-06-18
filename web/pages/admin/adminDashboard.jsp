@@ -64,23 +64,8 @@
             String msg = "";
 
             if ("APPROVE".equals(action)) {
-                String vehicleIdParam = request.getParameter("vehicleId");
-                Long vehicleId = null;
-                if (vehicleIdParam != null && !vehicleIdParam.trim().isEmpty()) {
-                    try {
-                        vehicleId = Long.parseLong(vehicleIdParam.trim());
-                    } catch (NumberFormatException ignored) {
-                        vehicleId = null;
-                    }
-                }
-                if (vehicleId == null) {
-                    msg = "Please select an available vehicle before approving.";
-                    session.setAttribute("errorMsg", msg);
-                    response.sendRedirect(request.getRequestURI());
-                    return;
-                }
-                success = adminDAO.approveBookingWithVehicle(bookingId, vehicleId);
-                msg = success ? "Booking approved and vehicle assigned." : "Failed to approve booking. Check vehicle availability and type.";
+                success = adminDAO.approveBookingWithVehicle(bookingId, null);
+                msg = success ? "Booking approved and reserved vehicle confirmed." : "Failed to approve booking. Check the reserved vehicle and booking status.";
             } else if ("REJECT".equals(action)) {
                 String rejectionReason = request.getParameter("rejectionReason");
                 if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
@@ -165,7 +150,7 @@
 
             <header>
                 <h1 class="text-3xl font-extrabold tracking-tight">Admin Decisions & Handover</h1>
-                <p class="text-slate-500">Review pending requests, assign matching vehicles, and record a reason when rejecting a booking.</p>
+                <p class="text-slate-500">Review pending requests, verify the reserved vehicle, and record a reason when rejecting a booking.</p>
             </header>
 
             <!-- Stats Grid -->
@@ -243,67 +228,11 @@
                                         } %>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <% if ("PENDING".equals(status)) { %>
-                                            <div class="space-y-3 min-w-[280px]">
-                                                <form method="POST" action="${pageContext.request.contextPath}/admin/decisions" class="space-y-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                                                    <input type="hidden" name="bookingId" value="<%= b.getId() %>">
-                                                    <input type="hidden" name="action" value="APPROVE">
-                                                    <div>
-                                                        <p class="text-[11px] font-bold uppercase tracking-wide text-blue-700 mb-1">Approve booking</p>
-                                                        <select name="vehicleId" class="w-full rounded-lg border border-blue-200 bg-white px-2 py-2 text-xs font-semibold">
-                                                            <option value="">Select matching vehicle</option>
-                                                            <%
-                                                                String requestedType = b.getVehicleType() == null ? "" : b.getVehicleType().name();
-                                                                String requestedCategory = normalizeVehicleCategory(requestedType);
-                                                                boolean hasMatch = false;
-                                                                if (availableVehicles != null) {
-                                                                    for (Vehicle v : availableVehicles) {
-                                                                        if (normalizeVehicleCategory(v.getType()).equals(requestedCategory)) {
-                                                                            hasMatch = true;
-                                                            %>
-                                                            <option value="<%= v.getId() %>"><%= esc(v.getLicensePlate()) %> | <%= esc(v.getType()) %></option>
-                                                            <%
-                                                                        }
-                                                                    }
-                                                                }
-                                                            %>
-                                                        </select>
-                                                    </div>
-                                                    <% if (!hasMatch) { %>
-                                                        <span class="text-[11px] text-amber-700 font-semibold">No available vehicle of this type.</span>
-                                                    <% } else { %>
-                                                        <p class="text-[11px] text-blue-700">Approval will assign the selected vehicle and mark it unavailable.</p>
-                                                    <% } %>
-                                                    <button type="submit" <%= hasMatch ? "" : "disabled" %> class="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white <%= hasMatch ? "hover:bg-blue-700" : "opacity-50 cursor-not-allowed" %>">Approve Request</button>
-                                                </form>
-
-                                                <form method="POST" action="${pageContext.request.contextPath}/admin/decisions" class="space-y-2 rounded-xl border border-red-100 bg-red-50/70 p-3">
-                                                    <input type="hidden" name="bookingId" value="<%= b.getId() %>">
-                                                    <input type="hidden" name="action" value="REJECT">
-                                                    <div>
-                                                        <p class="text-[11px] font-bold uppercase tracking-wide text-red-700 mb-1">Reject booking</p>
-                                                        <textarea name="rejectionReason" rows="3" required maxlength="500" placeholder="Explain why this request is rejected" class="w-full rounded-lg border border-red-200 bg-white px-2 py-2 text-xs text-slate-700 focus:ring-2 focus:ring-red-200"></textarea>
-                                                    </div>
-                                                    <p class="text-[11px] text-red-700">A reason is required and will be shown to the student.</p>
-                                                    <button type="submit" onclick="return confirm('Reject this booking and save the reason?')" class="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700">Reject Request</button>
-                                                </form>
-                                            </div>
-                                        <% } else if ("APPROVED".equals(status) && isAdmin) { %>
-                                            <div class="flex flex-wrap gap-2">
-                                                <form method="POST" action="${pageContext.request.contextPath}/admin/decisions">
-                                                    <input type="hidden" name="bookingId" value="<%= b.getId() %>">
-                                                    <button name="action" value="GENERATE_HANDOVER" class="border border-blue-600 text-blue-600 px-3 py-1 rounded text-xs font-bold">Issue Key</button>
-                                                </form>
-                                                <form method="POST" action="${pageContext.request.contextPath}/admin/decisions">
-                                                    <input type="hidden" name="bookingId" value="<%= b.getId() %>">
-                                                    <button name="action" value="COMPLETE" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold">Complete</button>
-                                                </form>
-                                                <form method="POST" action="${pageContext.request.contextPath}/admin/decisions">
-                                                    <input type="hidden" name="bookingId" value="<%= b.getId() %>">
-                                                    <button name="action" value="REVOKE" class="bg-red-50 text-red-600 px-3 py-1 rounded text-xs font-bold" onclick="return confirm('Revoke this?')">Revoke</button>
-                                                </form>
-                                            </div>
-                                        <% } %>
+                                        <a href="${pageContext.request.contextPath}/admin/decisions?action=detail&bookingId=<%= b.getId() %>"
+                                           class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800">
+                                            <span class="material-symbols-outlined text-[18px]">visibility</span>
+                                            Review Details
+                                        </a>
                                     </td>
                                 </tr>
                             <% } } %>

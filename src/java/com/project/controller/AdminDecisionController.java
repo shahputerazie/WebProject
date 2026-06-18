@@ -22,7 +22,12 @@ public class AdminDecisionController extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // Fetch all bookings for the admin dashboard
+        String action = request.getParameter("action");
+        if ("detail".equalsIgnoreCase(action)) {
+            showBookingDetail(request, response);
+            return;
+        }
+
         request.setAttribute("bookings", bookingDAO.getAllBookings());
         request.setAttribute("availableVehicles", new VehicleDAO().getVehiclesByStatus("AVAILABLE"));
         request.setAttribute("sidebarActive", "admin");
@@ -37,27 +42,14 @@ public class AdminDecisionController extends HttpServlet {
         
         String action = request.getParameter("action");
         Long bookingId = Long.parseLong(request.getParameter("bookingId"));
-        Long vehicleId = null;
-        String vehicleIdParam = request.getParameter("vehicleId");
-        if (vehicleIdParam != null && !vehicleIdParam.trim().isEmpty()) {
-            try {
-                vehicleId = Long.valueOf(vehicleIdParam.trim());
-            } catch (NumberFormatException ignored) {
-                vehicleId = null;
-            }
-        }
         
         boolean success = false;
         String message = "";
 
         switch (action) {
             case "APPROVE":
-                if (vehicleId == null) {
-                    message = "Please select an available vehicle before approving.";
-                    break;
-                }
-                success = adminDAO.approveBookingWithVehicle(bookingId, vehicleId);
-                message = success ? "Booking approved and vehicle assigned." : "Failed to approve booking. Check vehicle availability and type.";
+                success = adminDAO.approveBookingWithVehicle(bookingId, null);
+                message = success ? "Booking approved and reserved vehicle confirmed." : "Failed to approve booking. Check the reserved vehicle and booking status.";
                 break;
             case "REJECT":
                 String rejectionReason = request.getParameter("rejectionReason");
@@ -90,5 +82,34 @@ public class AdminDecisionController extends HttpServlet {
 
         session.setAttribute(success ? "successMsg" : "errorMsg", message);
         response.sendRedirect(request.getContextPath() + "/admin/decisions");
+    }
+
+    private void showBookingDetail(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        Long bookingId = parseLong(request.getParameter("bookingId"));
+        if (bookingId == null) {
+            response.sendRedirect(request.getContextPath() + "/admin/decisions");
+            return;
+        }
+
+        BookingRequest booking = bookingDAO.getBookingById(bookingId);
+        if (booking == null) {
+            response.sendRedirect(request.getContextPath() + "/admin/decisions");
+            return;
+        }
+
+        request.setAttribute("booking", booking);
+        request.setAttribute("sidebarActive", "admin");
+        request.getRequestDispatcher("/pages/admin/bookingReview.jsp").forward(request, response);
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }
