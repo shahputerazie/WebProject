@@ -210,6 +210,40 @@
                                     <input type="hidden" name="passengerCount" id="passengerCount" value="<%= "SUV".equals(defaultVehicleType) ? "7" : "4" %>"/>
                                 </div>
 
+                                <div class="rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/5 via-white to-surface-container-low p-5 shadow-sm">
+                                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                        <div>
+                                            <h3 class="font-semibold text-on-surface">Price Prediction</h3>
+                                            <p class="text-sm text-on-surface-variant mt-1">
+                                                Your estimated rental fee updates automatically before you submit.
+                                            </p>
+                                        </div>
+                                        <span class="inline-flex items-center gap-2 self-start rounded-full border border-outline-variant/20 bg-white px-3 py-1 text-xs font-semibold text-on-surface-variant">
+                                            <span class="material-symbols-outlined text-[16px]">calculate</span>
+                                            Auto calculated
+                                        </span>
+                                    </div>
+
+                                    <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                        <div class="rounded-2xl border border-outline-variant/10 bg-white p-4">
+                                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Rental days</p>
+                                            <p id="previewDays" class="mt-2 text-2xl font-headline font-bold text-on-surface">-</p>
+                                        </div>
+                                        <div class="rounded-2xl border border-outline-variant/10 bg-white p-4">
+                                            <p class="text-[11px] uppercase tracking-[0.18em] text-on-surface-variant">Daily rate</p>
+                                            <p id="previewDailyRate" class="mt-2 text-2xl font-headline font-bold text-on-surface">RM -</p>
+                                        </div>
+                                        <div class="rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                                            <p class="text-[11px] uppercase tracking-[0.18em] text-primary">Estimated fee</p>
+                                            <p id="previewEstimatedFee" class="mt-2 text-2xl font-headline font-bold text-primary">RM -</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 rounded-2xl border border-dashed border-outline-variant/20 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+                                        Late fee remains fixed at RM 25.00 per hour for overdue returns.
+                                    </div>
+                                </div>
+
                                 <label class="block">
                                     <span class="text-sm font-semibold text-on-surface-variant">Purpose of Trip</span>
                                     <textarea name="purpose" rows="5" maxlength="500" required placeholder="Briefly explain the official activity." class="mt-1 w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm focus:ring-1 focus:ring-surface-tint"></textarea>
@@ -320,9 +354,18 @@
         <script>
             const vehicleInputs = document.querySelectorAll('input[name="vehicleType"]');
             const passengerCount = document.getElementById('passengerCount');
+            const tripDateInput = document.getElementById('tripDate');
+            const returnDateInput = document.getElementById('returnDate');
+            const previewDays = document.getElementById('previewDays');
+            const previewDailyRate = document.getElementById('previewDailyRate');
+            const previewEstimatedFee = document.getElementById('previewEstimatedFee');
             const presets = {
                 SEDAN: 4,
                 SUV: 7
+            };
+            const rates = {
+                SEDAN: 80,
+                SUV: 130
             };
 
             function syncPassengerCount() {
@@ -333,10 +376,71 @@
                 passengerCount.value = presets[selected.value] || 4;
             }
 
+            function formatMoney(value) {
+                return 'RM ' + value.toFixed(2);
+            }
+
+            function parseDate(value) {
+                if (!value) {
+                    return null;
+                }
+                const parts = value.split('-').map(Number);
+                if (parts.length !== 3 || parts.some(Number.isNaN)) {
+                    return null;
+                }
+                return new Date(parts[0], parts[1] - 1, parts[2]);
+            }
+
+            function syncPricePreview() {
+                const selected = document.querySelector('input[name="vehicleType"]:checked');
+                const tripDate = parseDate(tripDateInput && tripDateInput.value);
+                const returnDate = parseDate(returnDateInput && returnDateInput.value);
+
+                if (!selected || !tripDate || !returnDate || !previewDays || !previewDailyRate || !previewEstimatedFee) {
+                    if (previewDays) {
+                        previewDays.textContent = '-';
+                    }
+                    if (previewDailyRate) {
+                        previewDailyRate.textContent = 'RM -';
+                    }
+                    if (previewEstimatedFee) {
+                        previewEstimatedFee.textContent = 'RM -';
+                    }
+                    return;
+                }
+
+                const dayMs = 24 * 60 * 60 * 1000;
+                const diff = Math.floor((returnDate.getTime() - tripDate.getTime()) / dayMs) + 1;
+
+                if (diff < 1) {
+                    previewDays.textContent = '-';
+                    previewDailyRate.textContent = formatMoney(rates[selected.value] || 0);
+                    previewEstimatedFee.textContent = 'Invalid dates';
+                    return;
+                }
+
+                const dailyRate = rates[selected.value] || 0;
+                const estimatedFee = dailyRate * diff;
+
+                previewDays.textContent = String(diff);
+                previewDailyRate.textContent = formatMoney(dailyRate);
+                previewEstimatedFee.textContent = formatMoney(estimatedFee);
+            }
+
             vehicleInputs.forEach((input) => {
                 input.addEventListener('change', syncPassengerCount);
+                input.addEventListener('change', syncPricePreview);
             });
+            if (tripDateInput) {
+                tripDateInput.addEventListener('change', syncPricePreview);
+                tripDateInput.addEventListener('input', syncPricePreview);
+            }
+            if (returnDateInput) {
+                returnDateInput.addEventListener('change', syncPricePreview);
+                returnDateInput.addEventListener('input', syncPricePreview);
+            }
             syncPassengerCount();
+            syncPricePreview();
         </script>
         <script src="${pageContext.request.contextPath}/assets/js/table-sort.js"></script>
     </body>

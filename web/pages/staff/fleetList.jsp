@@ -226,36 +226,29 @@
 
                                     <!-- Actions -->
                                     <td class="p-4 text-right">
-
-                                        <div class="flex justify-end gap-2">
-
-                                            <!-- Edit -->
+                                        <div class="flex justify-end gap-3">
                                             <a href="${pageContext.request.contextPath}/VehicleController?action=edit&id=${v.id}"
-                                               class="p-2 rounded-lg text-blue-600 hover:bg-blue-50">
-
-                                                <span class="material-symbols-outlined">
+                                               class="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2">
+                                                <span class="material-symbols-outlined text-[18px]">
                                                     edit
                                                 </span>
+                                                Edit
                                             </a>
 
-                                            <!-- Delete -->
                                             <form action="${pageContext.request.contextPath}/VehicleController"
                                                   method="POST"
                                                   onsubmit="return confirm('Delete this vehicle?');">
-
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="id" value="${v.id}">
 
                                                 <button type="submit"
-                                                        class="p-2 rounded-lg text-red-600 hover:bg-red-50">
-
-                                                    <span class="material-symbols-outlined">
+                                                        class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-rose-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-300 focus:ring-offset-2">
+                                                    <span class="material-symbols-outlined text-[18px]">
                                                         delete
                                                     </span>
+                                                    Delete
                                                 </button>
-
                                             </form>
-
                                         </div>
                                     </td>
 
