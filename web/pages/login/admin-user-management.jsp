@@ -71,21 +71,31 @@
                                         </span>
                                     </td>
                                     <td class="p-4 text-right">
-                                        <c:if test="${u.active}">
-                                            <form action="${pageContext.request.contextPath}/AdminUserController" method="POST" onsubmit="return confirm('Deactivate this account?')">
-                                                <input type="hidden" name="action" value="deactivate">
-                                                <input type="hidden" name="userId" value="${u.userId}">
-                                                <button type="submit" class="text-red-500 hover:text-red-700 text-sm font-semibold">Deactivate</button>
-                                            </form>
-                                        </c:if>
-                                        <c:if test="${not u.active}">
-                                            <form action="${pageContext.request.contextPath}/AdminUserController" method="POST">
-                                                <input type="hidden" name="action" value="activate">
-                                                <input type="hidden" name="userId" value="${u.userId}">
-                                                <input type="hidden" name="role" value="${u.role}">
-                                                <button type="submit" class="text-blue-600 hover:text-blue-800 text-sm font-semibold">Activate</button>
-                                            </form>
-                                        </c:if>
+                                        <div class="flex justify-end">
+                                            <c:if test="${u.active}">
+                                                <form action="${pageContext.request.contextPath}/AdminUserController" method="POST" onsubmit="return confirm('Deactivate this account?')">
+                                                    <input type="hidden" name="action" value="deactivate">
+                                                    <input type="hidden" name="userId" value="${u.userId}">
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-rose-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-300 focus:ring-offset-2">
+                                                        <span class="material-symbols-outlined text-[18px]">person_off</span>
+                                                        Deactivate
+                                                    </button>
+                                                </form>
+                                            </c:if>
+                                            <c:if test="${not u.active}">
+                                                <form action="${pageContext.request.contextPath}/AdminUserController" method="POST">
+                                                    <input type="hidden" name="action" value="activate">
+                                                    <input type="hidden" name="userId" value="${u.userId}">
+                                                    <input type="hidden" name="role" value="${u.role}">
+                                                    <button type="submit"
+                                                            class="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2">
+                                                        <span class="material-symbols-outlined text-[18px]">person_check</span>
+                                                        Activate
+                                                    </button>
+                                                </form>
+                                            </c:if>
+                                        </div>
                                     </td>
                                 </tr>
                             </c:forEach>

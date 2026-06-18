@@ -10,12 +10,31 @@
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
     </head>
 
+    <%
+        String role = null;
+        if (session != null && session.getAttribute("role") instanceof String) {
+            role = ((String) session.getAttribute("role")).trim().toUpperCase();
+        }
+
+        String backUrl = request.getContextPath() + "/pages/user/userDashboard.jsp";
+        if ("ADMIN".equals(role)) {
+            backUrl = request.getContextPath() + "/pages/admin/dashboard.jsp";
+        } else if ("STAFF".equals(role)) {
+            backUrl = request.getContextPath() + "/pages/staff/dashboard.jsp";
+        }
+
+        String returnUrl = request.getParameter("returnUrl");
+        if (returnUrl != null && !returnUrl.trim().isEmpty() && returnUrl.startsWith(request.getContextPath() + "/")) {
+            backUrl = returnUrl;
+        }
+    %>
+
     <body class="bg-gray-50 font-sans min-h-screen flex items-center justify-center p-6">
 
         <div class="w-full max-w-2xl">
 
             <div class="mb-6 flex items-center gap-4">
-                <a href="${pageContext.request.contextPath}/pages/user/userDashboard.jsp"
+                <a href="<%= backUrl %>"
                    class="p-2 bg-white rounded-full border hover:bg-gray-100 transition">
                     <span class="material-symbols-outlined text-gray-600">arrow_back</span>
                 </a>
